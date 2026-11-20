@@ -383,25 +383,31 @@ impl eframe::App for AgentDeskApp {
                                     ui.add_space(8.0);
 
                                     let ip_str = match local_ip {
-                                        Some(ip) => format!("{}:{}", ip, local_port),
-                                        None => format!("127.0.0.1:{}", local_port),
+                                        Some(ip) => ip.to_string(),
+                                        None => "127.0.0.1".to_string(),
                                     };
 
                                     ui.label("Your IP Address:");
                                     ui.horizontal(|ui| {
-                                        ui.label(egui::RichText::new(&ip_str).size(20.0).strong().color(COLOR_SUCCESS));
+                                        ui.label(egui::RichText::new(&ip_str).size(24.0).strong().color(COLOR_SUCCESS));
                                         if ui.button("📋 Copy").clicked() {
                                             ui.output_mut(|o| o.copied_text = ip_str.clone());
                                         }
                                     });
 
                                     if let Some(id) = my_id {
-                                        ui.add_space(6.0);
-                                        ui.label("Your Connection ID:");
+                                        ui.add_space(8.0);
+                                        let formatted_id = if id.len() == 9 {
+                                            format!("{} {} {}", &id[0..3], &id[3..6], &id[6..9])
+                                        } else {
+                                            id.clone()
+                                        };
+
+                                        ui.label("Your AnyDesk ID (Direct):");
                                         ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new(id.as_str()).size(18.0).color(COLOR_PRIMARY).strong());
+                                            ui.label(egui::RichText::new(&formatted_id).size(26.0).color(COLOR_PRIMARY).strong());
                                             if ui.button("📋 Copy").clicked() {
-                                                ui.output_mut(|o| o.copied_text = id.clone());
+                                                ui.output_mut(|o| o.copied_text = formatted_id.clone());
                                             }
                                         });
                                     }
@@ -421,8 +427,8 @@ impl eframe::App for AgentDeskApp {
                                     ui.heading("🔗 Connect to Remote");
                                     ui.add_space(8.0);
 
-                                    ui.label("Remote IP or 9-Digit ID:");
-                                    ui.add(egui::TextEdit::singleline(&mut self.remote_target_input).hint_text("e.g. 192.168.1.50:9090"));
+                                    ui.label("Remote IP or Connection ID:");
+                                    ui.add(egui::TextEdit::singleline(&mut self.remote_target_input).hint_text("e.g. 192.168.1.15 or 482 195 730"));
 
                                     ui.add_space(12.0);
                                     if ui.button("🚀 Connect to Remote").clicked() && !self.remote_target_input.trim().is_empty() {

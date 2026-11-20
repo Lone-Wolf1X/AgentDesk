@@ -259,9 +259,14 @@ fn run_gui(
                     let et = evt_tx.clone();
                     let target_clone = target.clone();
                     rt_handle.spawn(async move {
+                        let cleaned = target_clone.replace([' ', '-'], "");
                         let parsed_addr = if let Ok(addr) = target_clone.parse::<SocketAddr>() {
                             Some(addr)
                         } else if let Ok(ip) = target_clone.parse::<std::net::IpAddr>() {
+                            Some(SocketAddr::new(ip, 9090))
+                        } else if let Ok(addr) = cleaned.parse::<SocketAddr>() {
+                            Some(addr)
+                        } else if let Ok(ip) = cleaned.parse::<std::net::IpAddr>() {
                             Some(SocketAddr::new(ip, 9090))
                         } else {
                             None
