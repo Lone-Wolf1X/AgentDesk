@@ -23,9 +23,18 @@ AgentDesk is **one single app** that can both **host** and **view** remote deskt
 
 ## 📥 Downloads
 
-Pre-built binaries are available with each release:
-- **[GitHub Releases](https://github.com/Lone-Wolf1X/AgentDesk/releases)**: Windows `.zip`, macOS `.tar.gz`, and Linux `.tar.gz`.
-- Or easily [build from source](docs/BUILD_DISTRIBUTION.md).
+Pre-built installers are available with each release:
+
+| Platform | Installer | Description |
+|----------|-----------|-------------|
+| 🪟 **Windows** | `AgentDesk-Setup-0.1.0.exe` | Classic Next→Next→Finish wizard, installs to `C:\Program Files\AgentDesk` |
+| 🍏 **macOS** | `AgentDesk-0.1.0.dmg` | Drag-to-Applications installer |
+| 🐧 **Linux (Ubuntu/Debian)** | `agentdesk_0.1.0_amd64.deb` | `sudo dpkg -i` or double-click |
+| 🐧 **Linux (Universal)** | `AgentDesk-0.1.0-x86_64.AppImage` | Portable, no install needed |
+
+**[➡ Download from GitHub Releases](https://github.com/Lone-Wolf1X/AgentDesk/releases)**
+
+📖 **[Full Installation Guide →](docs/INSTALLATION.md)**
 
 ## 🧪 Testing with Two Real Machines
 

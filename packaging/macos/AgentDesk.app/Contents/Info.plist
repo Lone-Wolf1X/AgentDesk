@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Identity -->
+    <key>CFBundleName</key>
+    <string>AgentDesk</string>
+    <key>CFBundleDisplayName</key>
+    <string>AgentDesk</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.nextgeninnovations.agentdesk</string>
+
+    <!-- Version -->
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+
+    <!-- Bundle Type -->
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>AGDK</string>
+
+    <!-- Executable & Icon -->
+    <key>CFBundleExecutable</key>
+    <string>agentdesk</string>
+    <key>CFBundleIconFile</key>
+    <string>icon</string>
+
+    <!-- Platform Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+        <string>x86_64</string>
+    </array>
+
+    <!-- UI Settings -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>LSUIElement</key>
+    <false/>
+
+    <!-- Copyright -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2025 Next Gen Innovations Private Limited and Abhishek Kumar Paswan. Made in Nepal. MIT License.</string>
+
+    <!-- Permissions - Required for screen sharing -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>AgentDesk requires Screen Recording permission to capture and share your screen with remote viewers. This permission is only used during active remote sessions.</string>
+
+    <key>NSAccessibilityUsageDescription</key>
+    <string>AgentDesk requires Accessibility permission to control the keyboard and mouse on behalf of a remote viewer during active sessions.</string>
+
+    <!-- Network -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>AgentDesk uses your local network to connect with other devices for remote desktop sessions.</string>
+
+    <!-- Supported file types -->
+    <key>CFBundleDocumentTypes</key>
+    <array/>
+
+    <!-- URL scheme for direct connection links: agentdesk://192.168.1.x -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>AgentDesk Connection</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>agentdesk</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

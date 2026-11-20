@@ -1,79 +1,188 @@
-name: Release
+name: AgentDesk Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.1.0)'
+        required: true
+        default: '0.1.0'
 
-permissions:
-  contents: write
+env:
+  CARGO_TERM_COLOR: always
+  APP_VERSION: ${{ github.ref_name || github.event.inputs.version }}
 
 jobs:
-  build-and-release:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bin_name: agentdesk.exe
-            package_name: agentdesk-windows-x86_64.zip
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            bin_name: agentdesk
-            package_name: agentdesk-macos-arm64.tar.gz
-          - os: macos-13
-            target: x86_64-apple-darwin
-            bin_name: agentdesk
-            package_name: agentdesk-macos-x86_64.tar.gz
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            bin_name: agentdesk
-            package_name: agentdesk-linux-x86_64.tar.gz
-
+  # ─────────────────────────────────────────────────────────
+  # Windows: Build release binary + Inno Setup installer
+  # ─────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows Installer (.exe)
+    runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
-
-      - name: Install Rust toolchain
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-pc-windows-msvc
 
-      - name: Build release binaries
-        run: cargo build --release --workspace --target ${{ matrix.target }}
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-      - name: Package binaries (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: Build release binary
+        run: cargo build --release -p agentdesk
+
+      - name: Install Inno Setup 6
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
         run: |
-          $dir = "package-agentdesk"
-          New-Item -ItemType Directory -Path $dir
-          Copy-Item "target/${{ matrix.target }}/release/agentdesk.exe" "$dir/"
-          Copy-Item "target/${{ matrix.target }}/release/agentdesk-signal.exe" "$dir/"
-          Copy-Item "README.md" "$dir/"
-          Copy-Item "LICENSE" "$dir/"
-          Compress-Archive -Path "$dir/*" -DestinationPath "${{ matrix.package_name }}"
+          New-Item -ItemType Directory -Force -Path dist\windows
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "packaging\windows\agentdesk-installer.iss"
 
-      - name: Package binaries (Unix)
-        if: runner.os != 'Windows'
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentdesk-windows-installer
+          path: dist/windows/AgentDesk-Setup-*.exe
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────
+  # macOS: Universal binary (ARM + Intel) + .dmg
+  # ─────────────────────────────────────────────────────────
+  build-macos:
+    name: macOS Installer (.dmg)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable (multi-target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build .dmg
+        run: bash packaging/macos/build-dmg.sh
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentdesk-macos-dmg
+          path: dist/macos/AgentDesk-*.dmg
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────
+  # Linux: .deb + .AppImage
+  # ─────────────────────────────────────────────────────────
+  build-linux:
+    name: Linux Packages (.deb + .AppImage)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
         run: |
-          DIR="package-agentdesk"
-          mkdir -p "$DIR"
-          cp "target/${{ matrix.target }}/release/agentdesk" "$DIR/"
-          cp "target/${{ matrix.target }}/release/agentdesk-signal" "$DIR/"
-          cp README.md LICENSE "$DIR/"
-          tar -czvf "${{ matrix.package_name }}" -C "$DIR" .
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcb1-dev libxkbcommon-dev \
+            libxrandr-dev libxi-dev libgl1-mesa-dev \
+            libglib2.0-dev libgtk-3-dev \
+            wget
 
-      - name: Upload Release Asset
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build release binary
+        run: cargo build --release -p agentdesk
+
+      - name: Build .deb package
+        run: |
+          cargo deb -p agentdesk --no-build
+          ls -la target/debian/
+
+      - name: Build AppImage
+        run: bash packaging/linux/build-appimage.sh
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentdesk-linux-packages
+          path: |
+            target/debian/*.deb
+            dist/linux/*.AppImage
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────
+  # GitHub Release: Attach all installers
+  # ─────────────────────────────────────────────────────────
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets/
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.package_name }}
+          name: "AgentDesk ${{ github.ref_name }} — Made in Nepal 🇳🇵"
+          body: |
+            ## AgentDesk ${{ github.ref_name }}
+
+            **Free & Open Source Remote Desktop — Made in Nepal 🇳🇵**
+            by [Next Gen Innovations Private Limited](https://nextgeninnovations.com.np/)
+
+            ---
+
+            ### 📥 Downloads
+
+            | Platform | File | Description |
+            |----------|------|-------------|
+            | 🪟 Windows | `AgentDesk-Setup-*.exe` | Classic installation wizard |
+            | 🍏 macOS | `AgentDesk-*.dmg` | Drag-to-Applications installer |
+            | 🐧 Linux (Ubuntu/Debian) | `agentdesk_*.deb` | dpkg package |
+            | 🐧 Linux (Universal) | `AgentDesk-*-x86_64.AppImage` | Portable, no install needed |
+
+            ### ✨ Highlights
+            - ✅ 100% Free — no time limits, no device limits, no account required
+            - ✅ No telemetry, no phone-home, no ads
+            - ✅ Direct P2P LAN/WAN connections (no relay server needed)
+            - ✅ AnyDesk/TeamViewer-style Accept/Reject permission model
+            - ✅ MIT License — use, modify, and distribute freely
+
+            See [INSTALLATION.md](docs/INSTALLATION.md) for step-by-step install instructions.
+          files: |
+            release-assets/agentdesk-windows-installer/*.exe
+            release-assets/agentdesk-macos-dmg/*.dmg
+            release-assets/agentdesk-linux-packages/**/*.deb
+            release-assets/agentdesk-linux-packages/**/*.AppImage
+          draft: false
+          prerelease: false

@@ -1,12 +1,19 @@
 [Desktop Entry]
-Version=1.0
 Type=Application
+Version=1.5
 Name=AgentDesk
 GenericName=Remote Desktop
 Comment=Free & Open Source Remote Desktop — Made in Nepal
 Exec=agentdesk %u
 Icon=agentdesk
 Terminal=false
-Categories=Network;RemoteAccess;Utility;
-Keywords=remote;desktop;vnc;rdp;anydesk;teamviewer;
-StartupWMClass=agentdesk
+StartupWMClass=AgentDesk
+StartupNotify=true
+Categories=Network;RemoteAccess;
+Keywords=remote;desktop;screen;sharing;control;anydesk;teamviewer;
+MimeType=x-scheme-handler/agentdesk;
+Actions=new-connection;
+
+[Desktop Action new-connection]
+Name=New Remote Connection
+Exec=agentdesk

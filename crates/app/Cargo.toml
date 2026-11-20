@@ -26,3 +26,26 @@ eframe.workspace = true
 egui.workspace = true
 rand.workspace = true
 parking_lot.workspace = true
+
+# ─── cargo-deb: Debian/Ubuntu package metadata ───────────────────────────────
+[package.metadata.deb]
+name = "agentdesk"
+maintainer = "Abhishek Kumar Paswan <dev@nextgeninnovations.com.np>"
+copyright = "2025, Next Gen Innovations Private Limited and Abhishek Kumar Paswan"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+AgentDesk is a high-performance, 100% free and open source remote desktop application. \
+Connect to any machine on your network, control keyboard and mouse, share screens — \
+no time limits, no device limits, no account required, no telemetry. \
+Made in Nepal by Next Gen Innovations Private Limited."""
+section = "net"
+priority = "optional"
+depends = "$auto, libx11-6, libxcb1, libxkbcommon0"
+assets = [
+    ["../../target/release/agentdesk", "usr/bin/", "755"],
+    ["../../packaging/linux/agentdesk.desktop", "usr/share/applications/", "644"],
+    ["../../packaging/linux/agentdesk.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
+    ["../../README.md", "usr/share/doc/agentdesk/README.md", "644"],
+    ["../../LICENSE", "usr/share/doc/agentdesk/copyright", "644"],
+]
+
