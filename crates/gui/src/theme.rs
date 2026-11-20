@@ -38,7 +38,7 @@ pub fn draw_header(ui: &mut egui::Ui, title: &str) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             Frame::none()
                 .fill(Color32::from_rgb(40, 25, 30))
-                .stroke(Stroke::new(1.0, COLOR_PRIMARY))
+                .stroke(Stroke::new(1.0_f32, COLOR_PRIMARY))
                 .rounding(Rounding::same(12.0))
                 .inner_margin(Margin::symmetric(10.0, 4.0))
                 .show(ui, |ui| {
@@ -60,7 +60,7 @@ pub fn draw_about_box(ui: &mut egui::Ui) {
     Frame::none()
         .fill(Color32::from_rgb(24, 24, 30))
         .rounding(Rounding::same(6.0))
-        .stroke(Stroke::new(1.0, Color32::from_rgb(45, 45, 55)))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 45, 55)))
         .inner_margin(Margin::same(12.0))
         .show(ui, |ui| {
             ui.horizontal(|ui| {

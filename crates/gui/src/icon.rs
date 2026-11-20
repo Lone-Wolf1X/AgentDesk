@@ -91,12 +91,26 @@ pub fn generate_icon_rgba(size: u32) -> (u32, u32, Vec<u8>) {
     (size, size, rgba)
 }
 
+const ICON_BYTES: &[u8] = include_bytes!("../../../assets/icon.png");
+
 /// Returns the egui IconData to set as window and taskbar icon.
+/// Loads the user-supplied custom application logo if available, or falls back to procedural icon.
 pub fn get_app_icon() -> IconData {
-    let (width, height, rgba) = generate_icon_rgba(64);
-    IconData {
-        rgba,
-        width,
-        height,
+    if let Ok(img) = image::load_from_memory(ICON_BYTES) {
+        let resized = img.resize(128, 128, image::imageops::FilterType::Lanczos3);
+        let rgba = resized.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        IconData {
+            rgba: rgba.into_raw(),
+            width,
+            height,
+        }
+    } else {
+        let (width, height, rgba) = generate_icon_rgba(64);
+        IconData {
+            rgba,
+            width,
+            height,
+        }
     }
 }
