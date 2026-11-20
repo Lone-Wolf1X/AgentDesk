@@ -1,0 +1,18 @@
+/target
+Cargo.lock
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test outputs & frames
+frames/
+*.png
+*.ppm
+
+# OS files
+.DS_Store
+Thumbs.db

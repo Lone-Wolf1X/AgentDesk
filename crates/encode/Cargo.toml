@@ -1,0 +1,21 @@
+[package]
+name = "agentdesk-encode"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "H.264 video encoding and decoding wrapper with openh264 and hardware stubs"
+
+[features]
+default = []
+hardware-encode-nvenc = []
+hardware-encode-videotoolbox = []
+hardware-encode-vaapi = []
+
+[dependencies]
+agentdesk-core.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+openh264.workspace = true
+image.workspace = true

@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/capture",
+    "crates/input",
+    "crates/encode",
+    "crates/net",
+    "crates/agent-api",
+    "crates/host",
+    "crates/viewer",
+    "crates/integration-tests",
+    "signal-server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AgentDesk Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/agentdesk/agentdesk"
+description = "Rust Remote Desktop Control System for AI Agents"
+
+[workspace.dependencies]
+# Internal crates
+agentdesk-core = { path = "crates/core" }
+agentdesk-capture = { path = "crates/capture" }
+agentdesk-input = { path = "crates/input" }
+agentdesk-encode = { path = "crates/encode" }
+agentdesk-net = { path = "crates/net" }
+agentdesk-agent-api = { path = "crates/agent-api" }
+
+# Async runtime & networking
+tokio = { version = "1.41", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec", "net"] }
+tokio-stream = "0.1"
+futures = "0.3"
+bytes = "1.8"
+
+# Web / HTTP / WebSocket
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tokio-tungstenite = "0.24"
+
+# TLS & Security
+tokio-rustls = "0.26"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1.10"
+rustls-pemfile = "2.2"
+rcgen = "0.13"
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2.6"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI & Configuration
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Logging & Diagnostics
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Screen Capture, Input & Media
+scap = "0.1"
+rdev = "0.5"
+openh264 = "0.6"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+base64 = "0.22"
+
+# Concurrency & Utils
+parking_lot = "0.12"
+async-trait = "0.1"
+crossbeam-channel = "0.5"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }

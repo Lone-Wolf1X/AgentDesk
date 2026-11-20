@@ -1,0 +1,23 @@
+[package]
+name = "agentdesk-agent-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Local Axum HTTP REST API for AI agent observation and desktop control"
+
+[dependencies]
+agentdesk-core.workspace = true
+agentdesk-capture.workspace = true
+agentdesk-input.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+image.workspace = true
+base64.workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "agentdesk-input"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Cross-platform input simulation and listening for AgentDesk"
+
+[dependencies]
+agentdesk-core.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+rdev.workspace = true
+crossbeam-channel.workspace = true

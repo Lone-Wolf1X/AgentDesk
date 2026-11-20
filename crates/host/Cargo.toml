@@ -1,0 +1,21 @@
+[package]
+name = "agentdesk-host"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Host server binary for AgentDesk: captures display, encodes H.264, and exposes Agent API"
+
+[dependencies]
+agentdesk-core.workspace = true
+agentdesk-capture.workspace = true
+agentdesk-input.workspace = true
+agentdesk-encode.workspace = true
+agentdesk-net.workspace = true
+agentdesk-agent-api.workspace = true
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true

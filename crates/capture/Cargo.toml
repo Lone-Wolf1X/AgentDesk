@@ -1,0 +1,15 @@
+[package]
+name = "agentdesk-capture"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Cross-platform screen capture abstraction and implementation for AgentDesk"
+
+[dependencies]
+agentdesk-core.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+image.workspace = true
+scap.workspace = true
