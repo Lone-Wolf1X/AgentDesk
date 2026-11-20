@@ -34,12 +34,10 @@ struct InstallerApp {
 
 impl Default for InstallerApp {
     fn default() -> Self {
-        let default_dir = if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            format!(r"{}\Programs\AgentDesk", local)
-        } else if let Ok(userprofile) = std::env::var("USERPROFILE") {
-            format!(r"{}\AppData\Local\Programs\AgentDesk", userprofile)
+        let default_dir = if let Ok(pf) = std::env::var("ProgramFiles") {
+            format!(r"{}\AgentDesk", pf)
         } else {
-            r"C:\AgentDesk".to_string()
+            r"C:\Program Files\AgentDesk".to_string()
         };
 
         Self {
@@ -57,8 +55,17 @@ impl Default for InstallerApp {
 impl InstallerApp {
     fn perform_installation(&mut self) -> Result<(), String> {
         let dest = PathBuf::from(&self.install_path);
+
+        // Clean up any legacy installation in AppData\Local\Programs\AgentDesk if installing to a new path
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            let legacy_dir = PathBuf::from(format!(r"{}\Programs\AgentDesk", local));
+            if legacy_dir.exists() && legacy_dir != dest {
+                let _ = fs::remove_dir_all(&legacy_dir);
+            }
+        }
+
         fs::create_dir_all(&dest)
-            .map_err(|e| format!("Failed to create destination folder: {e}"))?;
+            .map_err(|e| format!("Failed to create destination folder (please run as Administrator if installing in Program Files): {e}"))?;
 
         let exe_path = dest.join("agentdesk.exe");
         fs::write(&exe_path, AGENTDESK_EXE)

@@ -1,6 +1,7 @@
 //! Network transport layer for AgentDesk: TCP streaming, TLS encryption,
 //! and WebRTC abstraction.
 
+pub mod discovery;
 pub mod error;
 pub mod tcp_client;
 pub mod tcp_server;
@@ -8,6 +9,7 @@ pub mod tls;
 pub mod traits;
 pub mod webrtc_stub;
 
+pub use discovery::{PeerDiscovery, DISCOVERY_PORT};
 pub use error::NetError;
 pub use tcp_client::TcpViewerClient;
 pub use tcp_server::{bind_available_port, ActiveViewerSession, TcpHostServer};

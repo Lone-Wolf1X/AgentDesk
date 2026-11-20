@@ -551,72 +551,61 @@ impl eframe::App for AgentDeskApp {
 
                                                     ui.add_space(16.0);
 
-                                                    // IP Address
-                                                    let ip_str = local_ip.map(|ip| ip.to_string()).unwrap_or_else(|| "127.0.0.1".to_string());
-                                                    ui.label(egui::RichText::new("IP Address").color(COLOR_TEXT_MUTED).size(11.0));
-                                                    ui.add_space(2.0);
+                                                    // 9-Digit AgentDesk ID (No IP exposed - complete privacy)
+                                                    let id_str = my_id.clone().unwrap_or_else(|| "---------".to_string());
+                                                    let formatted_id = if id_str.len() == 9 {
+                                                        format!("{} {} {}", &id_str[0..3], &id_str[3..6], &id_str[6..9])
+                                                    } else {
+                                                        id_str.clone()
+                                                    };
+
+                                                    ui.label(
+                                                        egui::RichText::new("Your AgentDesk ID")
+                                                            .color(COLOR_TEXT)
+                                                            .size(13.0)
+                                                            .strong(),
+                                                    );
+                                                    ui.label(
+                                                        egui::RichText::new("Share this 9-digit ID with the remote person to connect")
+                                                            .color(COLOR_TEXT_MUTED)
+                                                            .size(11.0),
+                                                    );
+                                                    ui.add_space(4.0);
                                                     ui.horizontal(|ui| {
                                                         Frame::none()
                                                             .fill(COLOR_BG)
                                                             .rounding(Rounding::same(8.0))
                                                             .stroke(Stroke::new(1.5_f32, COLOR_BORDER_FOCUS))
-                                                            .inner_margin(Margin::symmetric(14.0, 10.0))
+                                                            .inner_margin(Margin::symmetric(16.0, 10.0))
                                                             .show(ui, |ui| {
                                                                 ui.label(
-                                                                    egui::RichText::new(&ip_str)
+                                                                    egui::RichText::new(&formatted_id)
                                                                         .size(26.0)
                                                                         .strong()
-                                                                        .color(COLOR_SUCCESS),
+                                                                        .color(COLOR_PRIMARY),
                                                                 );
                                                             });
                                                         ui.add_space(6.0);
                                                         let copy_btn = egui::Button::new(
-                                                            egui::RichText::new("⎘").size(16.0).color(COLOR_PRIMARY)
+                                                            egui::RichText::new("⎘  Copy ID")
+                                                                .size(13.0)
+                                                                .strong()
+                                                                .color(COLOR_PRIMARY)
                                                         )
                                                         .fill(COLOR_PRIMARY_LIGHT)
                                                         .rounding(Rounding::same(8.0))
-                                                        .min_size(egui::vec2(36.0, 36.0));
-                                                        if ui.add(copy_btn).on_hover_text("Copy IP").clicked() {
-                                                            ui.output_mut(|o| o.copied_text = ip_str.clone());
+                                                        .min_size(egui::vec2(90.0, 42.0));
+                                                        if ui.add(copy_btn).on_hover_text("Copy your 9-digit ID to clipboard").clicked() {
+                                                            ui.output_mut(|o| o.copied_text = id_str.clone());
                                                         }
                                                     });
 
-                                                    // Connection ID
-                                                    if let Some(id) = my_id {
-                                                        ui.add_space(14.0);
-                                                        let formatted_id = if id.len() == 9 {
-                                                            format!("{} {} {}", &id[0..3], &id[3..6], &id[6..9])
-                                                        } else {
-                                                            id.clone()
-                                                        };
-                                                        ui.label(egui::RichText::new("Connection ID").color(COLOR_TEXT_MUTED).size(11.0));
-                                                        ui.add_space(2.0);
-                                                        ui.horizontal(|ui| {
-                                                            Frame::none()
-                                                                .fill(COLOR_BG)
-                                                                .rounding(Rounding::same(8.0))
-                                                                .stroke(Stroke::new(1.5_f32, COLOR_BORDER))
-                                                                .inner_margin(Margin::symmetric(14.0, 10.0))
-                                                                .show(ui, |ui| {
-                                                                    ui.label(
-                                                                        egui::RichText::new(&formatted_id)
-                                                                            .size(22.0)
-                                                                            .strong()
-                                                                            .color(COLOR_PRIMARY),
-                                                                    );
-                                                                });
-                                                            ui.add_space(6.0);
-                                                            let copy_btn = egui::Button::new(
-                                                                egui::RichText::new("⎘").size(16.0).color(COLOR_TEXT_MUTED)
-                                                            )
-                                                            .fill(egui::Color32::from_rgb(241, 245, 249))
-                                                            .rounding(Rounding::same(8.0))
-                                                            .min_size(egui::vec2(36.0, 36.0));
-                                                            if ui.add(copy_btn).on_hover_text("Copy ID").clicked() {
-                                                                ui.output_mut(|o| o.copied_text = formatted_id.clone());
-                                                            }
-                                                        });
-                                                    }
+                                                    ui.add_space(10.0);
+                                                    ui.label(
+                                                        egui::RichText::new("🔒 Privacy Protected: Your IP is hidden. Direct connection via 9-digit ID.")
+                                                            .color(COLOR_TEXT_MUTED)
+                                                            .size(11.0),
+                                                    );
 
                                                     ui.add_space(16.0);
                                                     // Status badge
@@ -657,12 +646,13 @@ impl eframe::App for AgentDeskApp {
                                                         });
 
                                                     ui.add_space(16.0);
-                                                    ui.label(egui::RichText::new("Remote IP or Connection ID").color(COLOR_TEXT_MUTED).size(11.0));
+                                                    ui.label(egui::RichText::new("Remote AgentDesk ID").color(COLOR_TEXT).size(13.0).strong());
+                                                    ui.label(egui::RichText::new("Enter the 9-digit ID of the computer you want to control").color(COLOR_TEXT_MUTED).size(11.0));
                                                     ui.add_space(4.0);
 
                                                     // Large input field
                                                     let text_edit = egui::TextEdit::singleline(&mut self.remote_target_input)
-                                                        .hint_text("e.g.  192.168.1.15  or  482 195 730")
+                                                        .hint_text("e.g.  482 195 730")
                                                         .font(egui::FontId::proportional(16.0))
                                                         .desired_width(f32::INFINITY)
                                                         .margin(egui::vec2(12.0, 10.0));

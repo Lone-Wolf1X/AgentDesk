@@ -13,7 +13,7 @@ use agentdesk_core::types::{InputEvent, ScreenSize};
 use agentdesk_encode::{MockDecoder, MockEncoder, OpenH264Decoder, OpenH264Encoder, VideoDecoder, VideoEncoder};
 use agentdesk_gui::{AgentDeskApp, AppEvent, UiAction};
 use agentdesk_input::{InputInjector, MockInjector, RdevInjector};
-use agentdesk_net::{bind_available_port, TcpHostServer, TcpViewerClient};
+use agentdesk_net::{bind_available_port, PeerDiscovery, TcpHostServer, TcpViewerClient};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use rand::Rng;
@@ -80,10 +80,50 @@ fn print_branded_banner() {
     );
 }
 
-fn generate_9_digit_id() -> String {
+fn get_or_create_device_id() -> String {
+    let mut candidate_dirs = Vec::new();
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        candidate_dirs.push(std::path::PathBuf::from(appdata).join("AgentDesk"));
+    }
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        candidate_dirs.push(std::path::PathBuf::from(local).join("AgentDesk"));
+    }
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        candidate_dirs.push(std::path::PathBuf::from(home).join(".agentdesk"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidate_dirs.push(parent.to_path_buf());
+        }
+    }
+
+    // 1. Try reading existing ID from candidates
+    for dir in &candidate_dirs {
+        let id_file = dir.join("device_id.txt");
+        if let Ok(content) = std::fs::read_to_string(&id_file) {
+            let trimmed = content.trim().replace([' ', '-'], "");
+            if trimmed.len() == 9 && trimmed.chars().all(|c| c.is_ascii_digit()) {
+                return trimmed;
+            }
+        }
+    }
+
+    // 2. Generate new 9-digit random ID
     let mut rng = rand::thread_rng();
     let num: u32 = rng.gen_range(100_000_000..=999_999_999);
-    format!("{num}")
+    let new_id = format!("{num}");
+
+    // 3. Persist to first writable candidate directory
+    for dir in &candidate_dirs {
+        if std::fs::create_dir_all(dir).is_ok() {
+            let id_file = dir.join("device_id.txt");
+            if std::fs::write(&id_file, &new_id).is_ok() {
+                break;
+            }
+        }
+    }
+
+    new_id
 }
 
 fn main() -> Result<()> {
@@ -181,7 +221,7 @@ fn run_gui(
     let rt = tokio::runtime::Runtime::new().context("Failed to start Tokio runtime")?;
 
     let local_ip = get_local_ip();
-    let my_id = generate_9_digit_id();
+    let my_id = get_or_create_device_id();
 
     // 1. Auto-bind port in range 9090-9100
     let (listener, local_port) = rt.block_on(async {
@@ -193,6 +233,10 @@ fn run_gui(
             (tokio_listener, port)
         })
     });
+
+    // Start background LAN peer discovery beacon and query responder
+    let discovery = PeerDiscovery::new(my_id.clone(), local_port);
+    let peers = rt.block_on(async { discovery.start().await });
 
     let (ui_action_tx, ui_action_rx) = channel::<UiAction>();
     let (app_event_tx, app_event_rx) = channel::<AppEvent>();
@@ -251,6 +295,7 @@ fn run_gui(
     let f_tx = frame_tx.clone();
     let evt_tx = app_event_tx.clone();
     let rt_handle = rt.handle().clone();
+    let peers_map = peers.clone();
     std::thread::spawn(move || {
         while let Ok(action) = ui_action_rx.recv() {
             match action {
@@ -259,9 +304,15 @@ fn run_gui(
                     let ft = f_tx.clone();
                     let et = evt_tx.clone();
                     let target_clone = target.clone();
+                    let p_map = peers_map.clone();
                     rt_handle.spawn(async move {
                         let cleaned = target_clone.replace([' ', '-'], "");
-                        let parsed_addr = if let Ok(addr) = target_clone.parse::<SocketAddr>() {
+                        let is_id = cleaned.len() == 9 && cleaned.chars().all(|c| c.is_ascii_digit());
+
+                        let parsed_addr: Option<SocketAddr> = if is_id {
+                            info!("Resolving AgentDesk 9-digit ID {cleaned} on LAN...");
+                            PeerDiscovery::resolve_id(&p_map, &cleaned, 2500).await
+                        } else if let Ok(addr) = target_clone.parse::<SocketAddr>() {
                             Some(addr)
                         } else if let Ok(ip) = target_clone.parse::<std::net::IpAddr>() {
                             Some(SocketAddr::new(ip, 9090))
@@ -304,9 +355,14 @@ fn run_gui(
                                 }
                             }
                         } else {
-                            warn!("Could not parse target '{target_clone}' as IP or IP:PORT");
+                            let err_msg = if is_id {
+                                format!("Device ID '{target_clone}' not found on network. Please ensure AgentDesk is running on the other PC.")
+                            } else {
+                                format!("Invalid AgentDesk ID or Address: '{target_clone}'")
+                            };
+                            warn!("{err_msg}");
                             let _ = et.send(AppEvent::ConnectionFailed {
-                                error: format!("Invalid address: '{target_clone}'"),
+                                error: err_msg,
                             });
                         }
                     });
