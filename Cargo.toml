@@ -84,3 +84,14 @@ crossbeam-channel = "0.5"
 
 [patch.crates-io]
 scap = { path = "patches/scap" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+overflow-checks = false
+
+[profile.release.package."*"]
+opt-level = 3
