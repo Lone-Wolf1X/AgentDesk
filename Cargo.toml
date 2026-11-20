@@ -16,10 +16,11 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Abhishek Kumar Paswan <abhishek@nextgeninnovations.com.np>", "Next Gen Innovations Private Limited"]
+authors = [
+    "Abhishek Kumar Paswan <abhishek@nextgeninnovations.com.np>",
+    "Next Gen Innovations Private Limited <contact@nextgeninnovations.com.np>",
+]
 license = "MIT"
-repository = "https://github.com/nextgeninnovations/agentdesk"
-description = "Free & Open Source Remote Desktop — Made in Nepal 🇳🇵"
 
 [workspace.dependencies]
 # Internal crates
@@ -33,15 +34,12 @@ agentdesk-gui = { path = "crates/gui" }
 # Async runtime & networking
 tokio = { version = "1.41", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec", "net"] }
-tokio-stream = "0.1"
 futures = "0.3"
 bytes = "1.8"
 
 # Web / WebSocket
 axum = { version = "0.7", features = ["ws", "macros"] }
-tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
-tokio-tungstenite = "0.24"
 
 # TLS & Security
 tokio-rustls = "0.26"
@@ -74,7 +72,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Screen Capture, Input & Media
-scap = "0.1"
+scap = "0.1.0-beta.1"
 rdev = "0.5"
 openh264 = "0.6"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -83,3 +81,6 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 parking_lot = "0.12"
 async-trait = "0.1"
 crossbeam-channel = "0.5"
+
+[patch.crates-io]
+scap = { path = "patches/scap" }

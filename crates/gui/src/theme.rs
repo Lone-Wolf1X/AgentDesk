@@ -5,7 +5,7 @@
 // License: MIT — see LICENSE file
 // Made in Nepal 🇳🇵
 
-use egui::{Color32, Stroke};
+use egui::Color32;
 
 pub const COLOR_PRIMARY: Color32 = Color32::from_rgb(220, 20, 60);
 pub const COLOR_BG_DARK: Color32 = Color32::from_rgb(24, 24, 28);

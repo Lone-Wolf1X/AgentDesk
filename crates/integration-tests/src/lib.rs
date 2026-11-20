@@ -7,7 +7,8 @@
 
 #[cfg(test)]
 mod tests {
-    use agentdesk_capture::{CaptureConfig, MockCapturer, ScreenCapturer};
+    use agentdesk_capture::{MockCapturer, ScreenCapturer};
+    use agentdesk_core::config::CaptureConfig;
     use agentdesk_core::protocol::EncodedVideoPacket;
     use agentdesk_core::types::{InputEvent, ScreenSize};
     use agentdesk_encode::{MockDecoder, MockEncoder, VideoDecoder, VideoEncoder};
@@ -20,8 +21,7 @@ mod tests {
     async fn test_end_to_end_remote_desktop_stream() {
         let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
 
-        let tcp_port = 19095;
-        let tcp_addr: SocketAddr = format!("127.0.0.1:{tcp_port}").parse().unwrap();
+        let tcp_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let password = "test-session-pass".to_string();
 
         let screen_size = ScreenSize {
@@ -32,6 +32,7 @@ mod tests {
         let (video_broadcast_tx, _) = broadcast::channel::<EncodedVideoPacket>(32);
         let (input_event_tx, mut input_event_rx) = mpsc::channel::<InputEvent>(32);
         let (tcp_shutdown_tx, tcp_shutdown_rx) = mpsc::channel::<()>(1);
+        let (bound_tx, bound_rx) = tokio::sync::oneshot::channel::<SocketAddr>();
 
         // 1. Start Host TCP Server
         let host_server = TcpHostServer::new(
@@ -44,14 +45,14 @@ mod tests {
         );
 
         let host_task = tokio::spawn(async move {
-            let _ = host_server.run(tcp_shutdown_rx).await;
+            let _ = host_server.run_with_bound_addr(tcp_shutdown_rx, Some(bound_tx)).await;
         });
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        let actual_addr = bound_rx.await.expect("Failed to get bound addr");
 
         // 2. Connect Viewer Client
         let (handshake, mut viewer_video_rx, viewer_input_tx) =
-            TcpViewerClient::connect(tcp_addr, password.clone(), true, None)
+            TcpViewerClient::connect(actual_addr, password.clone(), true, None)
                 .await
                 .expect("Viewer failed to connect to host");
 
@@ -68,6 +69,7 @@ mod tests {
             let frame = capturer.capture_frame().unwrap();
             let packet = encoder.encode_frame(&frame).unwrap();
             video_broadcast_tx.send(packet).unwrap();
+            tokio::time::sleep(Duration::from_millis(25)).await;
         }
 
         // 4. Verify Viewer decodes all 10 frames

@@ -19,3 +19,4 @@ anyhow.workspace = true
 tracing.workspace = true
 openh264.workspace = true
 image.workspace = true
+serde.workspace = true

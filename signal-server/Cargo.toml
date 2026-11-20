@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Lightweight WebSocket WebRTC signaling server for AgentDesk Phase 2"
+description = "Lightweight WebSocket WebRTC signaling server for AgentDesk"
 
 [dependencies]
 tokio.workspace = true
@@ -16,3 +16,5 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 clap.workspace = true
 anyhow.workspace = true
+rand.workspace = true
+futures.workspace = true

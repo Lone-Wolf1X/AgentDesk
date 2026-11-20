@@ -47,6 +47,9 @@ impl ScapCapturer {
     }
 }
 
+unsafe impl Send for ScapCapturer {}
+unsafe impl Sync for ScapCapturer {}
+
 impl ScreenCapturer for ScapCapturer {
     fn capture_frame(&mut self) -> Result<Frame, CaptureError> {
         let capturer = self
@@ -59,19 +62,11 @@ impl ScreenCapturer for ScapCapturer {
                 match scap_frame {
                     scap::frame::Frame::Video(video_frame) => {
                         let (w, h, bgra, stride) = match video_frame {
-                            scap::frame::VideoFrame::Bgra(f) => {
-                                (f.width as u32, f.height as u32, f.raw, (f.width * 4) as u32)
+                            scap::frame::VideoFrame::BGRA(f) => {
+                                (f.width as u32, f.height as u32, f.data, (f.width * 4) as u32)
                             }
-                            scap::frame::VideoFrame::Rgba(f) => {
-                                // Convert RGBA to BGRA
-                                let mut raw = f.raw;
-                                for chunk in raw.chunks_exact_mut(4) {
-                                    let r = chunk[0];
-                                    let b = chunk[2];
-                                    chunk[0] = b;
-                                    chunk[2] = r;
-                                }
-                                (f.width as u32, f.height as u32, raw, (f.width * 4) as u32)
+                            scap::frame::VideoFrame::BGR0(f) => {
+                                (f.width as u32, f.height as u32, f.data, (f.width * 4) as u32)
                             }
                             other => {
                                 return Err(CaptureError::CaptureFailed(format!(

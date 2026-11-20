@@ -8,11 +8,12 @@
 use anyhow::Result;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
-use axum::response::IntoResponse;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use clap::Parser;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,7 +21,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -42,8 +43,8 @@ pub struct HostRecord {
 }
 
 #[derive(Clone, Default)]
-struct AppState {
-    hosts: Arc<RwLock<HashMap<String, HostRecord>>>,
+pub struct AppState {
+    pub hosts: Arc<RwLock<HashMap<String, HostRecord>>>,
 }
 
 #[tokio::main]
@@ -82,27 +83,29 @@ async fn health_check() -> &'static str {
     "AgentDesk Signal Server: Healthy (Next Gen Innovations Private Limited 🇳🇵)"
 }
 
-#[derive(Deserialize)]
-struct RegisterRequest {
-    device_id: Option<String>,
-    ip_endpoint: String,
+#[derive(Deserialize, Debug)]
+pub struct RegisterRequest {
+    pub device_id: Option<String>,
+    pub ip_endpoint: String,
 }
 
-#[derive(Serialize)]
-struct RegisterResponse {
-    device_id: String,
-    status: String,
+#[derive(Serialize, Debug)]
+pub struct RegisterResponse {
+    pub device_id: String,
+    pub status: String,
 }
 
 async fn register_host(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
-) -> Json<RegisterResponse> {
-    let mut rng = rand::thread_rng();
-    let device_id = payload.device_id.unwrap_or_else(|| {
-        let num: u32 = rng.gen_range(100_000_000..=999_999_999);
-        format!("{num}")
-    });
+) -> Result<Json<RegisterResponse>, StatusCode> {
+    let device_id = match payload.device_id {
+        Some(id) => id,
+        None => {
+            let num: u32 = rand::thread_rng().gen_range(100_000_000..=999_999_999);
+            format!("{num}")
+        }
+    };
 
     let record = HostRecord {
         device_id: device_id.clone(),
@@ -117,29 +120,28 @@ async fn register_host(
     hosts.insert(device_id.clone(), record);
     info!("Registered host with 9-digit ID: {device_id}");
 
-    Json(RegisterResponse {
+    Ok(Json(RegisterResponse {
         device_id,
         status: "registered".to_string(),
-    })
+    }))
 }
 
 async fn resolve_id(
-    Path(id): Path<String>,
     State(state): State<AppState>,
-) -> Result<Json<HostRecord>, (axum::http::StatusCode, &'static str)> {
+    Path(id): Path<String>,
+) -> Response {
     let hosts = state.hosts.read().await;
     if let Some(record) = hosts.get(&id) {
-        Ok(Json(record.clone()))
+        Json(record.clone()).into_response()
     } else {
-        Err((axum::http::StatusCode::NOT_FOUND, "ID not found or host offline"))
+        (StatusCode::NOT_FOUND, "ID not found or host offline").into_response()
     }
 }
 
 async fn ws_handler(
-    ws: WebSocketUpgrade,
     Path(id): Path<String>,
-    State(_state): State<AppState>,
-) -> IntoResponse {
+    ws: WebSocketUpgrade,
+) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, id))
 }
 

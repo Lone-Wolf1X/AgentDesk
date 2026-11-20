@@ -8,7 +8,7 @@ use agentdesk_core::{InputEvent, Key, MouseButton};
 use rdev::{simulate, EventType};
 use std::thread;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// Production Input Injector using `rdev`.
 pub struct RdevInjector;

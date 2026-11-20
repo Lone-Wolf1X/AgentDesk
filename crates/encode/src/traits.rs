@@ -2,22 +2,9 @@
 
 use crate::error::EncodeError;
 use agentdesk_core::Frame;
-use serde::{Deserialize, Serialize};
 
-/// An encoded video packet (e.g. H.264 NAL units).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EncodedPacket {
-    /// Compressed bitstream data.
-    pub data: Vec<u8>,
-    /// Whether this packet contains an IDR / keyframe.
-    pub is_keyframe: bool,
-    /// Capture / presentation timestamp in milliseconds.
-    pub timestamp_ms: u64,
-    /// Width of the video frame.
-    pub width: u32,
-    /// Height of the video frame.
-    pub height: u32,
-}
+/// An encoded video packet (type alias to core protocol packet).
+pub type EncodedPacket = agentdesk_core::protocol::EncodedVideoPacket;
 
 /// Abstract video encoder.
 pub trait VideoEncoder: Send + Sync {

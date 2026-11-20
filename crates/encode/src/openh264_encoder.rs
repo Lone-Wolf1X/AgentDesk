@@ -4,7 +4,7 @@ use crate::error::EncodeError;
 use crate::traits::{EncodedPacket, VideoEncoder};
 use crate::yuv::bgra_to_yuv420p;
 use agentdesk_core::Frame;
-use openh264::encoder::{Encoder, EncoderConfig};
+use openh264::encoder::Encoder;
 use openh264::formats::YUVSource;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info};
@@ -19,8 +19,12 @@ struct YuvBufferSource<'a> {
 }
 
 impl<'a> YUVSource for YuvBufferSource<'a> {
-    fn width_and_height(&self) -> (usize, usize) {
+    fn dimensions(&self) -> (usize, usize) {
         (self.width, self.height)
+    }
+
+    fn strides(&self) -> (usize, usize, usize) {
+        (self.width, (self.width + 1) / 2, (self.width + 1) / 2)
     }
 
     fn y(&self) -> &[u8] {
@@ -33,18 +37,6 @@ impl<'a> YUVSource for YuvBufferSource<'a> {
 
     fn v(&self) -> &[u8] {
         self.v
-    }
-
-    fn y_stride(&self) -> usize {
-        self.width
-    }
-
-    fn u_stride(&self) -> usize {
-        (self.width + 1) / 2
-    }
-
-    fn v_stride(&self) -> usize {
-        (self.width + 1) / 2
     }
 }
 
@@ -61,12 +53,10 @@ pub struct OpenH264Encoder {
 impl OpenH264Encoder {
     /// Creates a new OpenH264 encoder for the given dimensions and bitrate.
     pub fn new(width: u32, height: u32, bitrate_kbps: u32, fps: f32) -> Result<Self, EncodeError> {
-        let config = EncoderConfig::new()
-            .bitrate_bps(bitrate_kbps * 1000)
-            .max_frame_rate(fps);
-
-        let encoder = Encoder::with_config(config)
+        let mut encoder = Encoder::new()
             .map_err(|e| EncodeError::EncoderInitFailed(format!("{e:?}")))?;
+
+        encoder.force_intra_frame();
 
         info!(
             "Initialized OpenH264 encoder: {width}x{height} @ {fps}fps, bitrate: {bitrate_kbps}kbps"
@@ -85,12 +75,10 @@ impl OpenH264Encoder {
     /// Re-initializes encoder when resolution changes.
     fn recreate_encoder(&mut self, new_w: u32, new_h: u32) -> Result<(), EncodeError> {
         info!("Recreating OpenH264 encoder for new resolution: {new_w}x{new_h}");
-        let config = EncoderConfig::new()
-            .bitrate_bps(self.bitrate_kbps * 1000)
-            .max_frame_rate(self.fps);
-
-        let encoder = Encoder::with_config(config)
+        let mut encoder = Encoder::new()
             .map_err(|e| EncodeError::EncoderInitFailed(format!("{e:?}")))?;
+
+        encoder.force_intra_frame();
 
         self.encoder = Some(encoder);
         self.width = new_w;
@@ -127,16 +115,17 @@ impl VideoEncoder for OpenH264Encoder {
             .as_mut()
             .ok_or_else(|| EncodeError::EncodingFailed("Encoder not initialized".to_string()))?;
 
+        let is_keyframe = self.force_keyframe;
+        if self.force_keyframe {
+            encoder.force_intra_frame();
+            self.force_keyframe = false;
+        }
+
         let stream = encoder
             .encode(&yuv_source)
             .map_err(|e| EncodeError::EncodingFailed(format!("{e:?}")))?;
 
         let data = stream.to_vec();
-        // Check if stream contains keyframe (IDR NAL type 5)
-        let is_keyframe = self.force_keyframe || stream.is_keyframe();
-        if self.force_keyframe {
-            self.force_keyframe = false;
-        }
 
         let timestamp_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)

@@ -54,9 +54,22 @@ impl TcpHostServer {
     }
 
     /// Runs the TCP listening loop until shutdown signal is received.
-    pub async fn run(self, mut shutdown_rx: mpsc::Receiver<()>) -> Result<(), NetError> {
+    pub async fn run(self, shutdown_rx: mpsc::Receiver<()>) -> Result<(), NetError> {
+        self.run_with_bound_addr(shutdown_rx, None).await
+    }
+
+    /// Runs the TCP listening loop and notifies the bound address over a channel.
+    pub async fn run_with_bound_addr(
+        self,
+        mut shutdown_rx: mpsc::Receiver<()>,
+        bound_addr_tx: Option<tokio::sync::oneshot::Sender<SocketAddr>>,
+    ) -> Result<(), NetError> {
         let listener = TcpListener::bind(self.listen_addr).await?;
-        info!("TCP Host listening for viewers on {}", self.listen_addr);
+        let local_addr = listener.local_addr()?;
+        if let Some(tx) = bound_addr_tx {
+            let _ = tx.send(local_addr);
+        }
+        info!("TCP Host listening for viewers on {}", local_addr);
 
         let tls_acceptor = if !self.disable_tls {
             let (server_config, cert_info) = create_server_tls_config()?;

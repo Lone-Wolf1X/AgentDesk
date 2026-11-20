@@ -6,7 +6,7 @@
 // Made in Nepal 🇳🇵
 
 use crate::theme::{draw_footer, draw_header, COLOR_SUCCESS, COLOR_WARNING};
-use agentdesk_core::types::{InputEvent, Key, MouseButton};
+use agentdesk_core::types::{InputEvent, MouseButton};
 use egui::{ColorImage, TextureHandle, TextureOptions};
 use std::sync::mpsc::{Receiver, Sender};
 

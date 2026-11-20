@@ -2,7 +2,6 @@
 
 use crate::error::EncodeError;
 use crate::traits::{EncodedPacket, VideoDecoder};
-use crate::yuv::yuv420p_to_bgra;
 use agentdesk_core::Frame;
 use openh264::decoder::Decoder;
 use openh264::formats::YUVSource;
@@ -30,8 +29,19 @@ impl VideoDecoder for OpenH264Decoder {
             .map_err(|e| EncodeError::DecodingFailed(format!("{e:?}")))?;
 
         if let Some(yuv) = decoded_yuv {
-            let (w, h) = yuv.width_and_height();
-            let bgra = yuv420p_to_bgra(yuv.y(), yuv.u(), yuv.v(), w, h);
+            let (w, h) = yuv.dimensions();
+            let mut rgba = vec![0u8; w * h * 4];
+            yuv.write_rgba8(&mut rgba);
+
+            // Convert RGBA to BGRA
+            let mut bgra = rgba;
+            for chunk in bgra.chunks_exact_mut(4) {
+                let r = chunk[0];
+                let b = chunk[2];
+                chunk[0] = b;
+                chunk[2] = r;
+            }
+
             let stride = (w * 4) as u32;
 
             Ok(Frame {
@@ -42,7 +52,6 @@ impl VideoDecoder for OpenH264Decoder {
                 timestamp: Instant::now(),
             })
         } else {
-            // Some packets like parameter sets (SPS/PPS) don't immediately produce a picture
             Err(EncodeError::DecodingFailed(
                 "Packet did not yield a decoded video picture (may be parameter set header)".to_string(),
             ))
