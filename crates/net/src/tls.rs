@@ -10,6 +10,8 @@ use tracing::info;
 
 /// Creates server TLS configuration using an auto-generated self-signed certificate.
 pub fn create_server_tls_config() -> Result<(Arc<ServerConfig>, CertInfo), NetError> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let cert_info = generate_self_signed_cert("agentdesk.local")
         .map_err(|e| NetError::TlsError(e.to_string()))?;
 
@@ -93,6 +95,8 @@ impl rustls::client::danger::ServerCertVerifier for FingerprintCertVerifier {
 
 /// Creates client TLS configuration, optionally pinning expected SHA-256 fingerprint.
 pub fn create_client_tls_config(expected_fingerprint: Option<String>) -> Arc<ClientConfig> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let verifier = Arc::new(FingerprintCertVerifier { expected_fingerprint });
 
     let config = ClientConfig::builder()

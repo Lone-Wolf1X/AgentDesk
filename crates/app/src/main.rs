@@ -87,6 +87,7 @@ fn generate_9_digit_id() -> String {
 }
 
 fn main() -> Result<()> {
+    agentdesk_net::init_crypto();
     tracing_subscriber::fmt::init();
     print_branded_banner();
 

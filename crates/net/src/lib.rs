@@ -14,3 +14,8 @@ pub use tcp_server::{bind_available_port, ActiveViewerSession, TcpHostServer};
 pub use tls::{create_client_tls_config, create_server_tls_config};
 pub use traits::Transport;
 pub use webrtc_stub::WebRtcTransportStub;
+
+/// Initializes process-wide TLS crypto provider (Ring).
+pub fn init_crypto() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}

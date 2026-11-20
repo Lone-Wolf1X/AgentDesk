@@ -1,0 +1,16 @@
+[package]
+name = "agentdesk-installer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Windows Installation Wizard for AgentDesk"
+
+[[bin]]
+name = "AgentDesk-Setup"
+path = "src/main.rs"
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+image.workspace = true
