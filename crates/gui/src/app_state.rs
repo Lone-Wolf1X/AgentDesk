@@ -5,6 +5,7 @@
 // License: MIT — see LICENSE file
 // Made in Nepal 🇳🇵
 
+use agentdesk_core::protocol::SessionPermissions;
 use egui::TextureHandle;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Instant;
@@ -32,8 +33,7 @@ impl Default for SessionStats {
 pub struct IncomingRequest {
     pub viewer_addr: SocketAddr,
     pub viewer_id: Option<String>,
-    pub password_ok: bool,
-    pub tls_fingerprint: String,
+    pub permissions: SessionPermissions,
 }
 
 pub enum AppState {
@@ -42,7 +42,6 @@ pub enum AppState {
         local_ip: Option<IpAddr>,
         local_port: u16,
         my_id: Option<String>,
-        password: String,
         host_listening: bool,
         incoming_request: Option<IncomingRequest>,
     },
@@ -50,6 +49,7 @@ pub enum AppState {
     Hosting {
         viewer_id: String,
         connected_since: Instant,
+        permissions: SessionPermissions,
         stats: SessionStats,
     },
     /// Connecting to remote in progress
@@ -62,6 +62,7 @@ pub enum AppState {
         remote_addr: String,
         texture: Option<TextureHandle>,
         connected_since: Instant,
+        permissions: SessionPermissions,
         stats: SessionStats,
     },
 }

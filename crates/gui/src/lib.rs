@@ -13,5 +13,5 @@ pub mod viewer_panel;
 
 pub use app_state::{AppState, IncomingRequest, SessionStats};
 pub use host_panel::HostGuiState;
-pub use unified_app::{AgentDeskApp, UiAction};
+pub use unified_app::{AgentDeskApp, AppEvent, UiAction};
 pub use viewer_panel::ViewerGuiState;

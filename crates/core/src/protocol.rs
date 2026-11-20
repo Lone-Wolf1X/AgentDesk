@@ -35,20 +35,92 @@ impl TryFrom<u8> for MsgType {
     }
 }
 
+/// Granular session permissions model (AnyDesk & TeamViewer hybrid).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionPermissions {
+    pub keyboard_mouse: bool,
+    pub clipboard: bool,
+    pub sound: bool,
+    pub whiteboard: bool,
+    pub restart: bool,
+    pub system_info: bool,
+    pub file_transfer: bool,
+    pub file_manager: bool,
+    pub print: bool,
+}
+
+impl Default for SessionPermissions {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
+impl SessionPermissions {
+    /// Standard Default Profile: core control on, sensitive file operations off.
+    pub fn standard() -> Self {
+        Self {
+            keyboard_mouse: true,
+            clipboard: true,
+            sound: true,
+            whiteboard: true,
+            restart: true,
+            system_info: true,
+            file_transfer: false,
+            file_manager: false,
+            print: false,
+        }
+    }
+
+    /// Full Control Profile: all permissions enabled.
+    pub fn full_control() -> Self {
+        Self {
+            keyboard_mouse: true,
+            clipboard: true,
+            sound: true,
+            whiteboard: true,
+            restart: true,
+            system_info: true,
+            file_transfer: true,
+            file_manager: true,
+            print: true,
+        }
+    }
+
+    /// View Only: screen watching only, no input or file control.
+    pub fn view_only() -> Self {
+        Self {
+            keyboard_mouse: false,
+            clipboard: false,
+            sound: true,
+            whiteboard: false,
+            restart: false,
+            system_info: true,
+            file_transfer: false,
+            file_manager: false,
+            print: false,
+        }
+    }
+}
+
 /// Client handshake request sent upon connection.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HandshakeRequest {
+    #[serde(default)]
     pub token: String,
     pub client_version: String,
+    #[serde(default)]
+    pub requested_permissions: Option<SessionPermissions>,
 }
 
-/// Host handshake response acknowledging authentication.
+/// Host handshake response acknowledging authentication and granted permissions.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HandshakeResponse {
     pub success: bool,
     pub reason: Option<String>,
     pub host_version: String,
     pub screen: ScreenSize,
+    #[serde(default)]
+    pub permissions: SessionPermissions,
 }
 
 /// Compressed video packet (e.g. H.264 NAL stream).

@@ -5,6 +5,7 @@ use crate::error::NetError;
 use crate::tls::create_client_tls_config;
 use agentdesk_core::protocol::{
     EncodedVideoPacket, FramingCodec, HandshakeRequest, HandshakeResponse, MsgType,
+    SessionPermissions,
 };
 use agentdesk_core::types::InputEvent;
 use futures::{SinkExt, StreamExt};
@@ -74,6 +75,7 @@ where
     let req = HandshakeRequest {
         token,
         client_version: env!("CARGO_PKG_VERSION").to_string(),
+        requested_permissions: Some(SessionPermissions::standard()),
     };
     let req_payload = serde_json::to_vec(&req)
         .map_err(|e| NetError::HandshakeFailed(e.to_string()))?;

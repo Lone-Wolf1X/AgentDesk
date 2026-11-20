@@ -11,7 +11,7 @@ use agentdesk_core::network_info::get_local_ip;
 use agentdesk_core::protocol::EncodedVideoPacket;
 use agentdesk_core::types::{InputEvent, ScreenSize};
 use agentdesk_encode::{MockDecoder, MockEncoder, OpenH264Decoder, OpenH264Encoder, VideoDecoder, VideoEncoder};
-use agentdesk_gui::{AgentDeskApp, UiAction};
+use agentdesk_gui::{AgentDeskApp, AppEvent, UiAction};
 use agentdesk_input::{InputInjector, MockInjector, RdevInjector};
 use agentdesk_net::{bind_available_port, TcpHostServer, TcpViewerClient};
 use anyhow::{Context, Result};
@@ -57,8 +57,6 @@ enum Mode {
         connect: Option<String>,
         #[arg(long)]
         id: Option<String>,
-        #[arg(long, env = "AGENTDESK_TOKEN")]
-        password: Option<String>,
         #[arg(long)]
         no_tls: bool,
     },
@@ -80,17 +78,6 @@ fn print_branded_banner() {
          License: MIT — 100% Free, No Limits, No Telemetry, No Account Required\n\
          =======================================================================\n"
     );
-}
-
-fn generate_random_password() -> String {
-    let mut rng = rand::thread_rng();
-    let chars: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
-    (0..8)
-        .map(|_| {
-            let idx = rng.gen_range(0..chars.len());
-            chars[idx] as char
-        })
-        .collect()
 }
 
 fn generate_9_digit_id() -> String {
@@ -120,13 +107,12 @@ fn main() -> Result<()> {
         Some(Mode::Connect {
             connect,
             id,
-            password,
             no_tls,
         }) => {
-            run_gui(connect, id, password, no_tls)
+            run_gui(connect, id, no_tls)
         }
         _ => {
-            run_gui(None, None, None, false)
+            run_gui(None, None, false)
         }
     }
 }
@@ -138,12 +124,11 @@ async fn run_headless_host(
     bitrate: u32,
     no_tls: bool,
 ) -> Result<()> {
-    let password = token.unwrap_or_else(generate_random_password);
+    let password = token.unwrap_or_default();
     let listen_addr: SocketAddr = listen.parse().context("Invalid listen address")?;
 
     info!("Starting AgentDesk Headless Host...");
     info!("Listen Address: {listen_addr}");
-    info!("Access Password: {password}");
 
     let (video_tx, _) = broadcast::channel::<EncodedVideoPacket>(64);
     let (input_tx, mut input_rx) = mpsc::channel::<InputEvent>(128);
@@ -190,13 +175,11 @@ async fn run_headless_host(
 fn run_gui(
     auto_connect: Option<String>,
     auto_id: Option<String>,
-    auto_password: Option<String>,
     no_tls: bool,
 ) -> Result<()> {
     let rt = tokio::runtime::Runtime::new().context("Failed to start Tokio runtime")?;
 
     let local_ip = get_local_ip();
-    let initial_password = auto_password.clone().unwrap_or_else(generate_random_password);
     let my_id = generate_9_digit_id();
 
     // 1. Auto-bind port in range 9090-9100
@@ -211,8 +194,8 @@ fn run_gui(
     });
 
     let (ui_action_tx, ui_action_rx) = channel::<UiAction>();
+    let (app_event_tx, app_event_rx) = channel::<AppEvent>();
     let (frame_tx, frame_rx) = channel::<(u32, u32, Vec<u8>)>();
-    let (net_input_tx, mut net_input_rx) = tokio::sync::mpsc::channel::<InputEvent>(128);
 
     // 2. Start background Host Server task
     let (video_broadcast_tx, _) = broadcast::channel::<EncodedVideoPacket>(64);
@@ -249,12 +232,11 @@ fn run_gui(
         }
     });
 
-    let pass_clone = initial_password.clone();
     rt.spawn(async move {
         let screen_size = ScreenSize { width: 1920, height: 1080 };
         let server = TcpHostServer::new(
             "0.0.0.0:0".parse().unwrap(),
-            pass_clone,
+            String::new(), // Direct connection, prompt-based accept
             screen_size,
             no_tls,
             video_broadcast_tx,
@@ -266,13 +248,15 @@ fn run_gui(
 
     // 3. UI Action processing loop
     let f_tx = frame_tx.clone();
+    let evt_tx = app_event_tx.clone();
     let rt_handle = rt.handle().clone();
     std::thread::spawn(move || {
         while let Ok(action) = ui_action_rx.recv() {
             match action {
-                UiAction::Connect { target, password } => {
+                UiAction::Connect { target } => {
                     info!("Initiating connection to {target}...");
                     let ft = f_tx.clone();
+                    let et = evt_tx.clone();
                     let target_clone = target.clone();
                     rt_handle.spawn(async move {
                         let parsed_addr = if let Ok(addr) = target_clone.parse::<SocketAddr>() {
@@ -284,9 +268,16 @@ fn run_gui(
                         };
 
                         if let Some(addr) = parsed_addr {
-                            match TcpViewerClient::connect(addr, password, no_tls, None).await {
+                            match TcpViewerClient::connect(addr, String::new(), no_tls, None).await {
                                 Ok((handshake, mut video_rx, net_in_tx)) => {
                                     info!("Connected to remote host {addr}! Screen: {:?}", handshake.screen);
+                                    let _ = et.send(AppEvent::Connected {
+                                        remote_addr: addr.to_string(),
+                                        permissions: handshake.permissions,
+                                        screen_size: (handshake.screen.width as f64, handshake.screen.height as f64),
+                                        input_tx: net_in_tx,
+                                    });
+
                                     let mut decoder: Box<dyn VideoDecoder> = match OpenH264Decoder::new() {
                                         Ok(d) => Box::new(d),
                                         Err(_) => Box::new(MockDecoder::new()),
@@ -301,15 +292,22 @@ fn run_gui(
                                 }
                                 Err(e) => {
                                     error!("Connection to {addr} failed: {e}");
+                                    let _ = et.send(AppEvent::ConnectionFailed {
+                                        error: e.to_string(),
+                                    });
                                 }
                             }
                         } else {
                             warn!("Could not parse target '{target_clone}' as IP or IP:PORT");
+                            let _ = et.send(AppEvent::ConnectionFailed {
+                                error: format!("Invalid address: '{target_clone}'"),
+                            });
                         }
                     });
                 }
                 UiAction::Disconnect => {
                     info!("Disconnect requested");
+                    let _ = evt_tx.send(AppEvent::Disconnected);
                 }
                 _ => {}
             }
@@ -321,19 +319,14 @@ fn run_gui(
         local_ip,
         local_port,
         Some(my_id),
-        initial_password,
         Some(ui_action_tx.clone()),
+        Some(app_event_rx),
+        Some(frame_rx),
     );
 
     if let Some(target) = auto_connect.or(auto_id) {
         app.remote_target_input = target.clone();
-        if let Some(ref pass) = auto_password {
-            app.remote_password_input = pass.clone();
-            let _ = ui_action_tx.send(UiAction::Connect {
-                target,
-                password: pass.clone(),
-            });
-        }
+        let _ = ui_action_tx.send(UiAction::Connect { target });
     }
 
     let native_options = eframe::NativeOptions {

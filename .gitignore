@@ -12,6 +12,7 @@ Cargo.lock
 frames/
 *.png
 *.ppm
+dist/
 
 # OS files
 .DS_Store

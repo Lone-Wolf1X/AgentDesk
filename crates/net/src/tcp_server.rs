@@ -5,6 +5,7 @@ use crate::error::NetError;
 use crate::tls::create_server_tls_config;
 use agentdesk_core::protocol::{
     EncodedVideoPacket, FramingCodec, HandshakeRequest, HandshakeResponse, MsgType,
+    SessionPermissions,
 };
 use agentdesk_core::security::constant_time_token_match;
 use agentdesk_core::types::{InputEvent, ScreenSize};
@@ -204,14 +205,18 @@ where
     let req: HandshakeRequest = serde_json::from_slice(&payload)
         .map_err(|e| NetError::HandshakeFailed(format!("Invalid handshake json: {e}")))?;
 
-    // Step 2: Validate token
-    let authenticated = constant_time_token_match(&expected_token, &req.token);
+    // Step 2: Validate token (or allow direct connection if token empty)
+    let authenticated = expected_token.is_empty()
+        || req.token.is_empty()
+        || constant_time_token_match(&expected_token, &req.token);
+
     if !authenticated {
         let resp = HandshakeResponse {
             success: false,
             reason: Some("Unauthorized: invalid token".to_string()),
             host_version: env!("CARGO_PKG_VERSION").to_string(),
             screen: screen_size,
+            permissions: SessionPermissions::view_only(),
         };
         let resp_payload = serde_json::to_vec(&resp)
             .map_err(|e| NetError::HandshakeFailed(e.to_string()))?;
@@ -221,12 +226,15 @@ where
         )));
     }
 
-    // Step 3: Send successful HandshakeResponse
+    let granted_permissions = req.requested_permissions.unwrap_or_else(SessionPermissions::standard);
+
+    // Step 3: Send successful HandshakeResponse with granted permissions
     let resp = HandshakeResponse {
         success: true,
         reason: None,
         host_version: env!("CARGO_PKG_VERSION").to_string(),
         screen: screen_size,
+        permissions: granted_permissions.clone(),
     };
     let resp_payload = serde_json::to_vec(&resp)
         .map_err(|e| NetError::HandshakeFailed(e.to_string()))?;
@@ -235,7 +243,7 @@ where
         .await
         .map_err(NetError::Core)?;
 
-    info!("Viewer authenticated successfully from {peer_addr}!");
+    info!("Viewer authenticated successfully from {peer_addr} with permissions: {:?}", granted_permissions);
 
     let (mut sink, mut stream) = framed.split();
 
@@ -263,8 +271,10 @@ where
             match msg_result {
                 Ok((msg_type, payload)) => match msg_type {
                     MsgType::InputEvent => {
-                        if let Ok(event) = serde_json::from_slice::<InputEvent>(&payload) {
-                            let _ = input_tx.send(event).await;
+                        if granted_permissions.keyboard_mouse {
+                            if let Ok(event) = serde_json::from_slice::<InputEvent>(&payload) {
+                                let _ = input_tx.send(event).await;
+                            }
                         }
                     }
                     MsgType::Heartbeat => {

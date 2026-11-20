@@ -5,8 +5,9 @@
 // License: MIT — see LICENSE file
 // Made in Nepal 🇳🇵
 
-use crate::app_state::{AppState, SessionStats};
-use crate::theme::{draw_footer, draw_header, COLOR_CARD_BG, COLOR_PRIMARY, COLOR_SUCCESS};
+use crate::app_state::{AppState, IncomingRequest, SessionStats};
+use crate::theme::{draw_footer, draw_header, COLOR_CARD_BG, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING};
+use agentdesk_core::protocol::SessionPermissions;
 use agentdesk_core::types::{InputEvent, MouseButton};
 use egui::{ColorImage, Frame, Margin, Rounding, TextureOptions};
 use std::net::IpAddr;
@@ -16,20 +17,37 @@ use std::time::Instant;
 /// Action emitted by the UI for background network execution.
 #[derive(Debug, Clone)]
 pub enum UiAction {
-    Connect { target: String, password: String },
+    Connect { target: String },
     Disconnect,
-    AcceptIncoming,
+    AcceptIncoming { permissions: SessionPermissions },
     RejectIncoming,
-    UpdatePassword(String),
+}
+
+/// Events sent from background networking tasks into the GUI.
+pub enum AppEvent {
+    Connected {
+        remote_addr: String,
+        permissions: SessionPermissions,
+        screen_size: (f64, f64),
+        input_tx: tokio::sync::mpsc::Sender<InputEvent>,
+    },
+    ConnectionFailed {
+        error: String,
+    },
+    IncomingRequest(IncomingRequest),
+    Disconnected,
 }
 
 /// Unified Single-Window AgentDesk Application
 pub struct AgentDeskApp {
+    pub local_ip: Option<IpAddr>,
+    pub local_port: u16,
+    pub my_id: Option<String>,
     pub state: AppState,
     pub remote_target_input: String,
-    pub remote_password_input: String,
     pub recent_connections: Vec<String>,
     pub action_sender: Option<Sender<UiAction>>,
+    pub event_receiver: Option<Receiver<AppEvent>>,
     pub frame_receiver: Option<Receiver<(u32, u32, Vec<u8>)>>,
     pub input_sender: Option<tokio::sync::mpsc::Sender<InputEvent>>,
     pub remote_screen_size: (f64, f64),
@@ -40,75 +58,96 @@ impl AgentDeskApp {
         local_ip: Option<IpAddr>,
         local_port: u16,
         my_id: Option<String>,
-        password: String,
         action_sender: Option<Sender<UiAction>>,
+        event_receiver: Option<Receiver<AppEvent>>,
+        frame_receiver: Option<Receiver<(u32, u32, Vec<u8>)>>,
     ) -> Self {
         Self {
+            local_ip,
+            local_port,
+            my_id: my_id.clone(),
             state: AppState::Idle {
                 local_ip,
                 local_port,
                 my_id,
-                password,
                 host_listening: true,
                 incoming_request: None,
             },
             remote_target_input: String::new(),
-            remote_password_input: String::new(),
             recent_connections: Vec::new(),
             action_sender,
-            frame_receiver: None,
+            event_receiver,
+            frame_receiver,
             input_sender: None,
             remote_screen_size: (1920.0, 1080.0),
         }
-    }
-
-    /// Transitions to viewing mode once network client successfully connects.
-    pub fn set_viewing(
-        &mut self,
-        remote_addr: String,
-        frame_rx: Receiver<(u32, u32, Vec<u8>)>,
-        input_tx: tokio::sync::mpsc::Sender<InputEvent>,
-        screen_size: (f64, f64),
-    ) {
-        if !self.recent_connections.contains(&remote_addr) {
-            self.recent_connections.insert(0, remote_addr.clone());
-            if self.recent_connections.len() > 5 {
-                self.recent_connections.pop();
-            }
-        }
-        self.frame_receiver = Some(frame_rx);
-        self.input_sender = Some(input_tx);
-        self.remote_screen_size = screen_size;
-        self.state = AppState::Viewing {
-            remote_addr,
-            texture: None,
-            connected_since: Instant::now(),
-            stats: SessionStats::default(),
-        };
-    }
-
-    /// Transitions back to Idle state.
-    pub fn set_idle(&mut self, local_ip: Option<IpAddr>, local_port: u16, my_id: Option<String>, password: String) {
-        self.frame_receiver = None;
-        self.input_sender = None;
-        self.state = AppState::Idle {
-            local_ip,
-            local_port,
-            my_id,
-            password,
-            host_listening: true,
-            incoming_request: None,
-        };
     }
 }
 
 impl eframe::App for AgentDeskApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 1. Process background network events
+        if let Some(ref rx) = self.event_receiver {
+            while let Ok(event) = rx.try_recv() {
+                match event {
+                    AppEvent::Connected {
+                        remote_addr,
+                        permissions,
+                        screen_size,
+                        input_tx,
+                    } => {
+                        self.input_sender = Some(input_tx);
+                        self.remote_screen_size = screen_size;
+                        if !self.recent_connections.contains(&remote_addr) {
+                            self.recent_connections.insert(0, remote_addr.clone());
+                            if self.recent_connections.len() > 5 {
+                                self.recent_connections.pop();
+                            }
+                        }
+                        self.state = AppState::Viewing {
+                            remote_addr,
+                            texture: None,
+                            connected_since: Instant::now(),
+                            permissions,
+                            stats: SessionStats::default(),
+                        };
+                    }
+                    AppEvent::ConnectionFailed { error } => {
+                        let target = match &self.state {
+                            AppState::Connecting { target, .. } => target.clone(),
+                            _ => self.remote_target_input.clone(),
+                        };
+                        self.state = AppState::Connecting {
+                            target,
+                            error: Some(error),
+                        };
+                    }
+                    AppEvent::IncomingRequest(req) => {
+                        if let AppState::Idle { ref mut incoming_request, .. } = self.state {
+                            *incoming_request = Some(req);
+                        }
+                    }
+                    AppEvent::Disconnected => {
+                        self.state = AppState::Idle {
+                            local_ip: self.local_ip,
+                            local_port: self.local_port,
+                            my_id: self.my_id.clone(),
+                            host_listening: true,
+                            incoming_request: None,
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. Render state-specific interface
+        let mut next_state = None;
         match &mut self.state {
             AppState::Viewing {
                 remote_addr,
                 texture,
                 connected_since,
+                permissions,
                 stats,
             } => {
                 // Poll for incoming video frames
@@ -132,6 +171,13 @@ impl eframe::App for AgentDeskApp {
                         ui.label(format!("Duration: {:02}:{:02}", elapsed / 60, elapsed % 60));
                         ui.separator();
                         ui.label(format!("Frames: {}", stats.frames_received));
+                        ui.separator();
+
+                        if permissions.keyboard_mouse {
+                            ui.label(egui::RichText::new("🖱️ Remote Control Active").color(COLOR_SUCCESS).small());
+                        } else {
+                            ui.label(egui::RichText::new("👁️ View Only").color(COLOR_WARNING).small());
+                        }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.button("❌ Disconnect").clicked() {
@@ -149,8 +195,8 @@ impl eframe::App for AgentDeskApp {
                         let available_size = ui.available_size();
                         let image_response = ui.image(egui::load::SizedTexture::new(tex.id(), available_size));
 
-                        // Capture user mouse & keyboard inputs over remote viewport
-                        if image_response.hovered() {
+                        // Capture user mouse & keyboard inputs over remote viewport if control permitted
+                        if permissions.keyboard_mouse && image_response.hovered() {
                             let rect = image_response.rect;
                             if let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) {
                                 let normalized_x = ((pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0);
@@ -203,6 +249,7 @@ impl eframe::App for AgentDeskApp {
             AppState::Hosting {
                 viewer_id,
                 connected_since,
+                permissions: _,
                 stats,
             } => {
                 egui::CentralPanel::default().show(ctx, |ui| {
@@ -241,6 +288,8 @@ impl eframe::App for AgentDeskApp {
                     ui.centered_and_justified(|ui| {
                         ui.vertical_centered(|ui| {
                             ui.heading(format!("Connecting to {target}..."));
+                            ui.add_space(8.0);
+                            ui.label(egui::RichText::new("Waiting for remote host to accept connection request...").color(COLOR_WARNING));
                             ui.add_space(10.0);
                             ui.spinner();
 
@@ -265,7 +314,6 @@ impl eframe::App for AgentDeskApp {
                 local_ip,
                 local_port,
                 my_id,
-                password,
                 host_listening: _,
                 incoming_request,
             } => {
@@ -273,7 +321,7 @@ impl eframe::App for AgentDeskApp {
                     draw_header(ui, "Free & Open Source Remote Desktop");
                     ui.add_space(10.0);
 
-                    // Incoming connection popup modal/card if present
+                    // Incoming connection popup with granular permission toggles and dual Accept buttons
                     if let Some(req) = incoming_request {
                         Frame::none()
                             .fill(COLOR_CARD_BG)
@@ -282,12 +330,34 @@ impl eframe::App for AgentDeskApp {
                             .inner_margin(Margin::same(16.0))
                             .show(ui, |ui| {
                                 ui.heading(egui::RichText::new("⚠️ Incoming Connection Request").color(COLOR_PRIMARY));
-                                ui.label(format!("A remote viewer ({}) wants to view and control your desktop.", req.viewer_addr));
-                                ui.add_space(10.0);
+                                ui.label(format!("Remote peer ({}) wants to view and control your desktop.", req.viewer_addr));
+                                ui.add_space(8.0);
+
+                                ui.label(egui::RichText::new("Session Permissions:").strong());
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.checkbox(&mut req.permissions.keyboard_mouse, "Keyboard & Mouse");
+                                    ui.checkbox(&mut req.permissions.clipboard, "Clipboard Sync");
+                                    ui.checkbox(&mut req.permissions.sound, "Sound Audio");
+                                    ui.checkbox(&mut req.permissions.whiteboard, "Whiteboard");
+                                    ui.checkbox(&mut req.permissions.restart, "Restart PC");
+                                    ui.checkbox(&mut req.permissions.file_transfer, "File Transfer");
+                                    ui.checkbox(&mut req.permissions.file_manager, "File Manager");
+                                });
+
+                                ui.add_space(12.0);
                                 ui.horizontal(|ui| {
-                                    if ui.button("✅ Accept Access").clicked() {
+                                    if ui.button("✅ Accept").clicked() {
                                         if let Some(ref tx) = self.action_sender {
-                                            let _ = tx.send(UiAction::AcceptIncoming);
+                                            let _ = tx.send(UiAction::AcceptIncoming {
+                                                permissions: req.permissions.clone(),
+                                            });
+                                        }
+                                    }
+                                    if ui.button("🛡️ Accept with Full Control").clicked() {
+                                        if let Some(ref tx) = self.action_sender {
+                                            let _ = tx.send(UiAction::AcceptIncoming {
+                                                permissions: SessionPermissions::full_control(),
+                                            });
                                         }
                                     }
                                     if ui.button("❌ Reject").clicked() {
@@ -336,22 +406,8 @@ impl eframe::App for AgentDeskApp {
                                         });
                                     }
 
-                                    ui.add_space(8.0);
-                                    ui.label("Access Password:");
-                                    ui.horizontal(|ui| {
-                                        let text_resp = ui.text_edit_singleline(password);
-                                        if text_resp.changed() {
-                                            if let Some(ref tx) = self.action_sender {
-                                                let _ = tx.send(UiAction::UpdatePassword(password.clone()));
-                                            }
-                                        }
-                                        if ui.button("📋 Copy").clicked() {
-                                            ui.output_mut(|o| o.copied_text = password.clone());
-                                        }
-                                    });
-
-                                    ui.add_space(10.0);
-                                    ui.label(egui::RichText::new("🟢 Status: Waiting for connections").color(COLOR_SUCCESS).small());
+                                    ui.add_space(12.0);
+                                    ui.label(egui::RichText::new("🟢 Status: Ready & Waiting for incoming connection requests").color(COLOR_SUCCESS).small());
                                 });
                         });
 
@@ -368,17 +424,15 @@ impl eframe::App for AgentDeskApp {
                                     ui.label("Remote IP or 9-Digit ID:");
                                     ui.add(egui::TextEdit::singleline(&mut self.remote_target_input).hint_text("e.g. 192.168.1.50:9090"));
 
-                                    ui.add_space(6.0);
-                                    ui.label("Remote Password:");
-                                    ui.add(egui::TextEdit::singleline(&mut self.remote_password_input).password(true));
-
                                     ui.add_space(12.0);
                                     if ui.button("🚀 Connect to Remote").clicked() && !self.remote_target_input.trim().is_empty() {
+                                        let target = self.remote_target_input.trim().to_string();
+                                        next_state = Some(AppState::Connecting {
+                                            target: target.clone(),
+                                            error: None,
+                                        });
                                         if let Some(ref tx) = self.action_sender {
-                                            let _ = tx.send(UiAction::Connect {
-                                                target: self.remote_target_input.trim().to_string(),
-                                                password: self.remote_password_input.clone(),
-                                            });
+                                            let _ = tx.send(UiAction::Connect { target });
                                         }
                                     }
 
@@ -401,8 +455,12 @@ impl eframe::App for AgentDeskApp {
             }
         }
 
+        if let Some(ns) = next_state {
+            self.state = ns;
+        }
+
         // Repaint continuously when viewing or hosting for smooth frame rates
-        if matches!(self.state, AppState::Viewing { .. } | AppState::Hosting { .. }) {
+        if matches!(self.state, AppState::Viewing { .. } | AppState::Hosting { .. } | AppState::Connecting { .. }) {
             ctx.request_repaint();
         }
     }

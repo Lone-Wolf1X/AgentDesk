@@ -19,7 +19,7 @@ pub use network_info::{get_all_local_ips, get_local_ip};
 pub use platform::{detect_platform_environment, PlatformEnvironment, PlatformKind};
 pub use protocol::{
     ControlMsg, EncodedVideoPacket, FramingCodec, HandshakeRequest, HandshakeResponse,
-    HeartbeatMsg, Message, MsgType,
+    HeartbeatMsg, Message, MsgType, SessionPermissions,
 };
 pub use security::{constant_time_token_match, generate_self_signed_cert, CertInfo};
 pub use types::{
