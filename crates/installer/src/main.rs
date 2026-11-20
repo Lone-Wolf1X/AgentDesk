@@ -281,6 +281,49 @@ impl eframe::App for InstallerApp {
                         ui.label(format!("An error occurred during installation:\n\n{err}"));
                     }
 
+                    ui.add_space(16.0);
+
+                    // Helpful recovery buttons for permission errors
+                    ui.horizontal(|ui| {
+                        let restart_btn = egui::Button::new(
+                            egui::RichText::new("🛡  Restart as Administrator")
+                                .color(egui::Color32::WHITE)
+                                .strong(),
+                        )
+                        .fill(egui::Color32::from_rgb(37, 99, 235))
+                        .rounding(egui::Rounding::same(8.0))
+                        .min_size(egui::vec2(200.0, 36.0));
+
+                        if ui.add(restart_btn).clicked() {
+                            if let Ok(exe) = std::env::current_exe() {
+                                let _ = Command::new("powershell")
+                                    .args([
+                                        "-NoProfile",
+                                        "-Command",
+                                        &format!("Start-Process -FilePath '{}' -Verb RunAs", exe.to_string_lossy().replace('\'', "''"))
+                                    ])
+                                    .spawn();
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                        }
+
+                        let user_btn = egui::Button::new(
+                            egui::RichText::new("Install for Current User (No Admin Needed)")
+                                .color(egui::Color32::from_rgb(15, 23, 42)),
+                        )
+                        .fill(egui::Color32::from_rgb(241, 245, 249))
+                        .stroke(egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(203, 213, 225)))
+                        .rounding(egui::Rounding::same(8.0))
+                        .min_size(egui::vec2(220.0, 36.0));
+
+                        if ui.add(user_btn).clicked() {
+                            if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                                self.install_path = format!(r"{}\Programs\AgentDesk", local);
+                            }
+                            self.step = WizardStep::Installing;
+                        }
+                    });
+
                     ui.add_space(20.0);
                     ui.horizontal(|ui| {
                         if ui.button("< Back").clicked() {
