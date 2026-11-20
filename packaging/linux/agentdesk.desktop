@@ -2,16 +2,11 @@
 Version=1.0
 Type=Application
 Name=AgentDesk
-GenericName=Remote Desktop Client
+GenericName=Remote Desktop
 Comment=Free & Open Source Remote Desktop — Made in Nepal
-Exec=agentdesk-viewer %u
+Exec=agentdesk %u
 Icon=agentdesk
 Terminal=false
 Categories=Network;RemoteAccess;Utility;
 Keywords=remote;desktop;vnc;rdp;anydesk;teamviewer;
-StartupWMClass=agentdesk-viewer
-Actions=HostMode;
-
-[Desktop Action HostMode]
-Name=Start AgentDesk Host
-Exec=agentdesk-host
+StartupWMClass=agentdesk

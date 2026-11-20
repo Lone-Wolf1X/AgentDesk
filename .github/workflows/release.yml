@@ -18,19 +18,19 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin_suffix: .exe
+            bin_name: agentdesk.exe
             package_name: agentdesk-windows-x86_64.zip
           - os: macos-latest
             target: aarch64-apple-darwin
-            bin_suffix: ''
+            bin_name: agentdesk
             package_name: agentdesk-macos-arm64.tar.gz
           - os: macos-13
             target: x86_64-apple-darwin
-            bin_suffix: ''
+            bin_name: agentdesk
             package_name: agentdesk-macos-x86_64.tar.gz
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            bin_suffix: ''
+            bin_name: agentdesk
             package_name: agentdesk-linux-x86_64.tar.gz
 
     steps:
@@ -57,8 +57,7 @@ jobs:
         run: |
           $dir = "package-agentdesk"
           New-Item -ItemType Directory -Path $dir
-          Copy-Item "target/${{ matrix.target }}/release/agentdesk-host.exe" "$dir/"
-          Copy-Item "target/${{ matrix.target }}/release/agentdesk-viewer.exe" "$dir/"
+          Copy-Item "target/${{ matrix.target }}/release/agentdesk.exe" "$dir/"
           Copy-Item "target/${{ matrix.target }}/release/agentdesk-signal.exe" "$dir/"
           Copy-Item "README.md" "$dir/"
           Copy-Item "LICENSE" "$dir/"
@@ -69,8 +68,7 @@ jobs:
         run: |
           DIR="package-agentdesk"
           mkdir -p "$DIR"
-          cp "target/${{ matrix.target }}/release/agentdesk-host" "$DIR/"
-          cp "target/${{ matrix.target }}/release/agentdesk-viewer" "$DIR/"
+          cp "target/${{ matrix.target }}/release/agentdesk" "$DIR/"
           cp "target/${{ matrix.target }}/release/agentdesk-signal" "$DIR/"
           cp README.md LICENSE "$DIR/"
           tar -czvf "${{ matrix.package_name }}" -C "$DIR" .

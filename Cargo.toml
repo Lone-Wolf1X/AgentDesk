@@ -7,8 +7,7 @@ members = [
     "crates/encode",
     "crates/net",
     "crates/gui",
-    "crates/host",
-    "crates/viewer",
+    "crates/app",
     "crates/integration-tests",
     "signal-server",
 ]

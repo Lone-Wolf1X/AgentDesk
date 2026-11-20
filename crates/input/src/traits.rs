@@ -36,6 +36,19 @@ pub trait InputInjector: Send + Sync {
 
     /// Simulates a parsed key combination (e.g. Ctrl+Shift+T).
     fn simulate_combo(&mut self, combo_str: &str) -> Result<(), InputError>;
+
+    /// Dispatches a high-level InputEvent to the appropriate injection method.
+    fn inject_event(&mut self, event: InputEvent) -> Result<(), InputError> {
+        match event {
+            InputEvent::MouseMove { x, y } => self.move_mouse(x, y),
+            InputEvent::MouseDown { button, .. } => self.click(button, true),
+            InputEvent::MouseUp { button, .. } => self.click(button, false),
+            InputEvent::MouseWheel { delta_x, delta_y } => self.mouse_scroll(delta_x, delta_y),
+            InputEvent::KeyDown { key } => self.key_press(key, true),
+            InputEvent::KeyUp { key } => self.key_press(key, false),
+            InputEvent::TextInput { text } => self.type_text(&text),
+        }
+    }
 }
 
 /// Trait for listening to physical user input on the local host.

@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod error;
+pub mod network_info;
 pub mod platform;
 pub mod protocol;
 pub mod security;
@@ -14,6 +15,7 @@ pub mod types;
 
 pub use config::{CaptureConfig, HostConfig, ViewerConfig};
 pub use error::CoreError;
+pub use network_info::{get_all_local_ips, get_local_ip};
 pub use platform::{detect_platform_environment, PlatformEnvironment, PlatformKind};
 pub use protocol::{
     ControlMsg, EncodedVideoPacket, FramingCodec, HandshakeRequest, HandshakeResponse,

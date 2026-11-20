@@ -10,7 +10,7 @@ pub mod webrtc_stub;
 
 pub use error::NetError;
 pub use tcp_client::TcpViewerClient;
-pub use tcp_server::{ActiveViewerSession, TcpHostServer};
+pub use tcp_server::{bind_available_port, ActiveViewerSession, TcpHostServer};
 pub use tls::{create_client_tls_config, create_server_tls_config};
 pub use traits::Transport;
 pub use webrtc_stub::WebRtcTransportStub;

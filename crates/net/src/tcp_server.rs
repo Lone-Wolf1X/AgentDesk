@@ -33,6 +33,20 @@ pub struct TcpHostServer {
     input_tx: mpsc::Sender<InputEvent>,
 }
 
+/// Finds and binds the first available TCP port in the inclusive range [start, end].
+pub async fn bind_available_port(start: u16, end: u16) -> Result<(TcpListener, u16), NetError> {
+    for port in start..=end {
+        match TcpListener::bind(("0.0.0.0", port)).await {
+            Ok(listener) => return Ok((listener, port)),
+            Err(_) => continue,
+        }
+    }
+    Err(NetError::Transport(format!(
+        "No available port in range {}-{}",
+        start, end
+    )))
+}
+
 impl TcpHostServer {
     /// Creates a new TCP host server.
     pub fn new(
@@ -58,10 +72,19 @@ impl TcpHostServer {
         self.run_with_bound_addr(shutdown_rx, None).await
     }
 
+    /// Runs the TCP listening loop with a pre-bound listener.
+    pub async fn run_with_listener(
+        self,
+        listener: TcpListener,
+        shutdown_rx: mpsc::Receiver<()>,
+    ) -> Result<(), NetError> {
+        self.run_listener_loop(listener, shutdown_rx).await
+    }
+
     /// Runs the TCP listening loop and notifies the bound address over a channel.
     pub async fn run_with_bound_addr(
         self,
-        mut shutdown_rx: mpsc::Receiver<()>,
+        shutdown_rx: mpsc::Receiver<()>,
         bound_addr_tx: Option<tokio::sync::oneshot::Sender<SocketAddr>>,
     ) -> Result<(), NetError> {
         let listener = TcpListener::bind(self.listen_addr).await?;
@@ -69,6 +92,15 @@ impl TcpHostServer {
         if let Some(tx) = bound_addr_tx {
             let _ = tx.send(local_addr);
         }
+        self.run_listener_loop(listener, shutdown_rx).await
+    }
+
+    async fn run_listener_loop(
+        self,
+        listener: TcpListener,
+        mut shutdown_rx: mpsc::Receiver<()>,
+    ) -> Result<(), NetError> {
+        let local_addr = listener.local_addr()?;
         info!("TCP Host listening for viewers on {}", local_addr);
 
         let tls_acceptor = if !self.disable_tls {

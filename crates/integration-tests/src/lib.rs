@@ -102,4 +102,61 @@ mod tests {
         let _ = tcp_shutdown_tx.send(()).await;
         let _ = host_task.await;
     }
+
+    #[tokio::test]
+    async fn test_single_binary_dual_role() {
+        use agentdesk_core::network_info::get_local_ip;
+        use agentdesk_net::bind_available_port;
+
+        let _ = tracing_subscriber::fmt().with_env_filter("info").try_init();
+
+        // 1. App acts as host: auto-detects IP, binds available port
+        let local_ip = get_local_ip().unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+        let (listener, port) = bind_available_port(9090, 9150).await.expect("Failed to bind port");
+        let host_addr = SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST), port);
+
+        let password = "dual-role-password".to_string();
+        let screen_size = ScreenSize { width: 1920, height: 1080 };
+        let (video_tx, _) = broadcast::channel::<EncodedVideoPacket>(32);
+        let (input_tx, mut input_rx) = mpsc::channel::<InputEvent>(32);
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>(1);
+
+        let host_server = TcpHostServer::new(
+            host_addr,
+            password.clone(),
+            screen_size,
+            true, // plain TCP for test
+            video_tx,
+            input_tx,
+        );
+
+        let host_handle = tokio::spawn(async move {
+            let _ = host_server.run_with_listener(listener, shutdown_rx).await;
+        });
+
+        // 2. Same app acts as viewer: connects to the host
+        let (handshake, _video_rx, viewer_input_tx) =
+            TcpViewerClient::connect(host_addr, password, true, None)
+                .await
+                .expect("Dual role: viewer failed to connect to host");
+
+        assert!(handshake.success);
+        assert_eq!(handshake.screen.width, 1920);
+        assert_eq!(handshake.screen.height, 1080);
+
+        // 3. Verify input flow
+        viewer_input_tx
+            .send(InputEvent::MouseMove { x: 100.0, y: 200.0 })
+            .await
+            .unwrap();
+
+        let received_input = tokio::time::timeout(Duration::from_millis(500), input_rx.recv())
+            .await
+            .unwrap();
+        assert_eq!(received_input, Some(InputEvent::MouseMove { x: 100.0, y: 200.0 }));
+
+        // Shutdown
+        let _ = shutdown_tx.send(()).await;
+        let _ = host_handle.await;
+    }
 }
