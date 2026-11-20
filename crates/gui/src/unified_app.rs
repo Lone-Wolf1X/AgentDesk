@@ -6,7 +6,7 @@
 // Made in Nepal 🇳🇵
 
 use crate::app_state::{AppState, IncomingRequest, SessionStats};
-use crate::theme::{draw_footer, draw_header, COLOR_CARD_BG, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING};
+use crate::theme::{draw_about_box, draw_footer, draw_header, COLOR_CARD_BG, COLOR_PRIMARY, COLOR_SUCCESS, COLOR_WARNING};
 use agentdesk_core::protocol::SessionPermissions;
 use agentdesk_core::types::{InputEvent, MouseButton};
 use egui::{ColorImage, Frame, Margin, Rounding, TextureOptions};
@@ -312,7 +312,7 @@ impl eframe::App for AgentDeskApp {
 
             AppState::Idle {
                 local_ip,
-                local_port,
+                local_port: _,
                 my_id,
                 host_listening: _,
                 incoming_request,
@@ -455,7 +455,9 @@ impl eframe::App for AgentDeskApp {
                         });
                     });
 
-                    ui.add_space(15.0);
+                    ui.add_space(14.0);
+                    draw_about_box(ui);
+                    ui.add_space(8.0);
                     draw_footer(ui);
                 });
             }

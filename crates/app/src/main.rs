@@ -336,7 +336,8 @@ fn run_gui(
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([900.0, 560.0])
+            .with_inner_size([920.0, 580.0])
+            .with_icon(agentdesk_gui::get_app_icon())
             .with_title("AgentDesk — Made in Nepal 🇳🇵 (Next Gen Innovations)"),
         ..Default::default()
     };
