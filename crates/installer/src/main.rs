@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 // AgentDesk — Installation Wizard for Windows
 // Copyright (c) 2025 Next Gen Innovations Private Limited
 // Developer: Abhishek Kumar Paswan
@@ -8,6 +10,20 @@ use eframe::egui;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn run_hidden_command(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let _ = cmd.output();
+}
 
 static AGENTDESK_EXE: &[u8] = include_bytes!("../../../target/release/agentdesk.exe");
 static ICON_ICO: &[u8] = include_bytes!("../../../assets/icon.ico");
@@ -94,9 +110,7 @@ impl InstallerApp {
                      $s.Save()",
                     desktop_lnk, exe_str, ico_str, dest_str
                 );
-                let _ = Command::new("powershell")
-                    .args(["-NoProfile", "-Command", &ps_script])
-                    .output();
+                run_hidden_command(Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]));
             }
         }
 
@@ -113,9 +127,7 @@ impl InstallerApp {
                      $s.Save()",
                     start_lnk, exe_str, ico_str, dest_str
                 );
-                let _ = Command::new("powershell")
-                    .args(["-NoProfile", "-Command", &ps_script])
-                    .output();
+                run_hidden_command(Command::new("powershell").args(["-NoProfile", "-Command", &ps_script]));
             }
         }
 
@@ -134,21 +146,11 @@ impl InstallerApp {
         let _ = fs::write(&uninstaller_path, uninstaller_content);
 
         // Register in Windows Add/Remove Programs (Registry)
-        let _ = Command::new("reg")
-            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayName", "/d", "AgentDesk", "/f"])
-            .output();
-        let _ = Command::new("reg")
-            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayVersion", "/d", "0.1.0", "/f"])
-            .output();
-        let _ = Command::new("reg")
-            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "Publisher", "/d", "Next Gen Innovations Private Limited", "/f"])
-            .output();
-        let _ = Command::new("reg")
-            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayIcon", "/d", &exe_path.to_string_lossy(), "/f"])
-            .output();
-        let _ = Command::new("reg")
-            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "UninstallString", "/d", &uninstaller_path.to_string_lossy(), "/f"])
-            .output();
+        run_hidden_command(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayName", "/d", "AgentDesk", "/f"]));
+        run_hidden_command(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayVersion", "/d", "0.1.0", "/f"]));
+        run_hidden_command(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "Publisher", "/d", "Next Gen Innovations Private Limited", "/f"]));
+        run_hidden_command(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "DisplayIcon", "/d", &exe_path.to_string_lossy(), "/f"]));
+        run_hidden_command(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AgentDesk", "/v", "UninstallString", "/d", &uninstaller_path.to_string_lossy(), "/f"]));
 
         Ok(())
     }

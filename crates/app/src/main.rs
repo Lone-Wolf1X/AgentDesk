@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 // AgentDesk — Free & Open Source Remote Desktop
 // Copyright (c) 2025 Next Gen Innovations Private Limited
 // Developer: Abhishek Kumar Paswan
