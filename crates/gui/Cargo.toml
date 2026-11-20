@@ -1,0 +1,16 @@
+[package]
+name = "agentdesk-gui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Shared egui graphical interface components for AgentDesk"
+
+[dependencies]
+agentdesk-core.workspace = true
+eframe.workspace = true
+egui.workspace = true
+image.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true

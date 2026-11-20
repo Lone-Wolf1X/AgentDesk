@@ -4,12 +4,15 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Viewer client binary for AgentDesk: receives H.264 stream, decodes and verifies frames"
+description = "Viewer client binary for AgentDesk: receives H.264 stream and displays in egui window"
 
 [dependencies]
 agentdesk-core.workspace = true
 agentdesk-encode.workspace = true
 agentdesk-net.workspace = true
+agentdesk-gui.workspace = true
+eframe.workspace = true
+egui.workspace = true
 tokio.workspace = true
 clap.workspace = true
 tracing.workspace = true
