@@ -1,9 +1,5 @@
-// AgentDesk — Free & Open Source Remote Desktop
-// Copyright (c) 2025 Next Gen Innovations Private Limited
-// Developer: Abhishek Kumar Paswan
-// Website: https://nextgeninnovations.com.np/
-// License: MIT — see LICENSE file
-// Made in Nepal 🇳🇵
+//! Core library for AgentDesk: types, network protocol, configuration,
+//! security primitives, and platform detection.
 
 pub mod config;
 pub mod error;
@@ -12,7 +8,7 @@ pub mod protocol;
 pub mod security;
 pub mod types;
 
-pub use config::{CaptureConfig, HostConfig, ViewerConfig};
+pub use config::{AgentApiConfig, CaptureConfig, HostConfig, ViewerConfig};
 pub use error::CoreError;
 pub use platform::{detect_platform_environment, PlatformEnvironment, PlatformKind};
 pub use protocol::{

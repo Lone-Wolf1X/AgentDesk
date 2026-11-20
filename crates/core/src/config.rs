@@ -1,25 +1,24 @@
-// AgentDesk — Free & Open Source Remote Desktop
-// Copyright (c) 2025 Next Gen Innovations Private Limited
-// Developer: Abhishek Kumar Paswan
-// Website: https://nextgeninnovations.com.np/
-// License: MIT — see LICENSE file
-// Made in Nepal 🇳🇵
+//! Configuration structures for host, viewer, agent-api, and capture engine.
 
-use crate::types::Rect;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use crate::types::Rect;
 
 /// Host server configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HostConfig {
     /// Address to bind TCP server for viewers (default "0.0.0.0:9090").
     pub listen_addr: SocketAddr,
-    /// Secret authentication password / token.
+    /// Secret authentication token.
     pub token: String,
     /// Target frame rate per second.
     pub fps: u32,
     /// Target video bitrate in kbps.
     pub bitrate_kbps: u32,
+    /// Whether to enable local agent HTTP API.
+    pub enable_agent_api: bool,
+    /// Local address for agent HTTP API (default "127.0.0.1:7878").
+    pub agent_api_addr: SocketAddr,
     /// Target display index to capture.
     pub display_index: usize,
     /// Whether TLS is disabled (plain TCP for local testing).
@@ -34,9 +33,11 @@ impl Default for HostConfig {
     fn default() -> Self {
         Self {
             listen_addr: "0.0.0.0:9090".parse().expect("valid listen addr"),
-            token: "pass123".to_string(),
+            token: "agentdesk-secret-token".to_string(),
             fps: 20,
             bitrate_kbps: 2000,
+            enable_agent_api: true,
+            agent_api_addr: "127.0.0.1:7878".parse().expect("valid agent addr"),
             display_index: 0,
             disable_tls: false,
             tls_cert_path: None,
@@ -50,7 +51,7 @@ impl Default for HostConfig {
 pub struct ViewerConfig {
     /// Remote host address to connect to.
     pub connect_addr: SocketAddr,
-    /// Authentication password / token.
+    /// Authentication token to present to the host.
     pub token: String,
     /// Expected SHA-256 TLS cert fingerprint for pinning.
     pub tls_fingerprint: Option<String>,
@@ -58,7 +59,7 @@ pub struct ViewerConfig {
     pub disable_tls: bool,
     /// Directory to save decoded frames as images.
     pub save_frames_dir: Option<String>,
-    /// Exit after receiving N frames.
+    /// Exit after receiving N frames (useful for integration tests).
     pub max_frames: Option<u64>,
 }
 
@@ -66,7 +67,7 @@ impl Default for ViewerConfig {
     fn default() -> Self {
         Self {
             connect_addr: "127.0.0.1:9090".parse().expect("valid connect addr"),
-            token: "pass123".to_string(),
+            token: "agentdesk-secret-token".to_string(),
             tls_fingerprint: None,
             disable_tls: false,
             save_frames_dir: None,
@@ -94,4 +95,13 @@ impl Default for CaptureConfig {
             crop_region: None,
         }
     }
+}
+
+/// Agent HTTP API configuration.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AgentApiConfig {
+    /// Local address to bind (strictly 127.0.0.1 recommended).
+    pub bind_addr: SocketAddr,
+    /// Authentication Bearer token.
+    pub token: String,
 }
